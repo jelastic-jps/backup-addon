@@ -1,5 +1,5 @@
 type: install
-version: 1.8.1
+jpsVersion: 7.1.1
 name: WP cluster storage topology
 
 onBeforeInstall: |

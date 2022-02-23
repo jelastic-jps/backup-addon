@@ -1,5 +1,5 @@
 type: update
-version: 1.8.1
+jpsVersion: 7.1.1
 name: Backup/Restore for WordPress Sites
 id: wp-backup
 logo: /images/backup-logo.png
