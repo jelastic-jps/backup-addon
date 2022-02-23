@@ -4,7 +4,7 @@ name: Backup Storage
 id: wp-restore	
 logo: /images/backup-logo.png	
 description: Software defined storage solution for snapshot backups of the WordPress web sites. It can be created as a single node or multi-node fault-tolerant scalable GlusterFS cluster. Backup storage can keep multiple backups of numerous WordPress sites created under single account.
-baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/master
+baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
 categories:
   - wordpress/extra
 
