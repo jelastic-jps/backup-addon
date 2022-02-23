@@ -1,0 +1,40 @@
+type: install	
+version: 1.8.1	
+name: Backup Storage	
+id: wp-restore	
+logo: /images/backup-logo.png	
+description: Software defined storage solution for snapshot backups of the WordPress web sites. It can be created as a single node or multi-node fault-tolerant scalable GlusterFS cluster. Backup storage can keep multiple backups of numerous WordPress sites created under single account.
+baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/master
+categories:
+  - wordpress/extra
+
+onBeforeInit: scripts/storageOnBeforeInit.js
+
+onInstall: 
+  - setupServer
+
+actions:
+  setupServer:
+    - install: 
+        jps: ${baseUrl}/storage-topology.jps
+        envName: ${settings.envName}
+        displayName: WP Backup Storage Server
+        settings: 
+          clusteredStorage: ${settings.clustered}
+          storageNodesCount: ${settings.storageNodesCount:1}
+          storageNodesSize: ${settings.storageSize:10}
+    - script: |
+        storageEnvGroups = eval('(' + MANIFEST + ')').envGroups;
+        if (!Array.isArray(storageEnvGroups)) {
+            storageEnvGroupsString = storageEnvGroups.toString();
+            storageEnvGroups = [];
+            if(storageEnvGroupsString.length != 0) {
+                storageEnvGroups.push(storageEnvGroupsString);
+            }
+        }
+        storageEnvGroups.push('WP Backup');
+        return jelastic.env.control.AttachEnvGroup({
+          envName    : '${settings.envName}',
+          session  : session,
+          envGroups: storageEnvGroups
+        });

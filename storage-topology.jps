@@ -1,0 +1,24 @@
+type: install
+version: 1.8.1
+name: WP cluster storage topology
+
+onBeforeInstall: |
+  var clusterEnabled = false;
+  if ("${settings.clusteredStorage}" == "true") {
+    clusterEnabled = true;
+  }
+  return {result:0, "nodes":[{"count":"${settings.storageNodesCount:1}","nodeGroup":"storage","nodeType":"storage", "diskLimit": "${settings.storageNodesSize:10}","cluster": clusterEnabled}]};
+
+nodes: definedInOnBeforeInstall
+
+onInstall:
+  - api: env.control.SetNodeGroupDisplayName
+    nodeGroup: storage
+    displayName: "WordPress backup storage"
+  - cmd [storage]: |-
+      yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/copart/restic/repo/epel-7/copart-restic-epel-7.repo
+      yum-config-manager --enable copr:copr.fedorainfracloud.org:copart:restic
+      yum -y install restic
+      yum-config-manager --disable copr:copr.fedorainfracloud.org:copart:restic
+      wget -O /root/getBackups.sh ${baseUrl}/scripts/getBackups.sh; chmod +x /root/getBackups.sh;
+    user: root

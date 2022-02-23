@@ -1,0 +1,261 @@
+type: update
+version: 1.8.1
+name: Backup/Restore for WordPress Sites
+id: wp-backup
+logo: /images/backup-logo.png
+description: Backup Add-On for WordPress sites. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
+baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/master
+categories:
+  - wordpress/extra
+
+targetNodes:
+  nodeGroup: cp
+
+settings:
+  main:
+    fields:
+      - type: radio-fieldset
+        name: scheduleType
+        hidden: false
+        default: '1'
+        values:
+          1: Pre-defined
+          2: Custom
+          3: Manual (crontab)
+        showIf:
+          1:
+            - name: cronTime
+              caption: Backup schedule
+              type: list
+              editable: false
+              values:
+                0 * * * * : "Hourly"
+                0 0 * * * : "Daily"
+                0 0 * * 0 : "Weekly"
+                0 0 1 * * : "Mountly"
+              default: 0 0 * * *
+          2:
+            - type: string
+              name: backupTime
+              caption: Time
+              inputType: time
+              default: "09:00"
+              cls: x-form-text
+              width: 120
+              required: true
+            - caption: Days
+              type: compositefield
+              name: days
+              defaultMargins: 0 12 0 0
+              items:
+                - name: sun
+                  value: true
+                  type: checkbox
+                  caption: Su
+                - name: mon
+                  value: true
+                  type: checkbox
+                  caption: Mo
+                - name: tue
+                  value: true
+                  type: checkbox
+                  caption: Tu
+                - name: wed
+                  value: true
+                  type: checkbox
+                  caption: We
+                - name: thu
+                  value: true
+                  type: checkbox
+                  caption: Th
+                - name: fri
+                  value: true
+                  type: checkbox
+                  caption: Fr
+                - name: sat
+                  value: true
+                  type: checkbox
+                  caption: Sa
+            - name: "tz"
+              caption: "Time Zone"
+              type: "list"
+              required: true
+              width: 250
+              editable: false
+              values: values
+          3:
+            - name: cronTime
+              caption: Backup schedule
+              tooltip: "<span>A simple <a href=\"https://en.wikipedia.org/wiki/Cron#Overview\"> cron-based</a>
+    scheduler to automatically start the backup process based on prescribed timing
+    instructions.</span><div><b>Note</b> that the required timestamps should be specified
+    respectively to the UTC time zone.</div>"              
+              type: string
+              default: 0 0 * * *
+              regexText: Cron syntax is incorrect!
+              regex: "^(((([\\\\*]{1}){1,})|((\\\\*\\\\\\/){0,1}(([0-9\\/\\*\\-\\,]{1}){1,}|(([1-5]{1}){1}([0-9\\/\\*\\-\\,]{1}){1,}){1})))
+              ((([\\\\*]{1}){1,})|((\\\\*\\\\\\/){0,1}(([0-9\\/\\*\\-\\,]{1}){1,}|(([1]{1}){1}([0-9\\/\\*\\-\\,-]{1}){1,}){1}|([2]{1}){1}([0-3]{1}){1})))
+              ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([1-9]{1}){1}|(([1-2]{1}){1}([0-9\\/\\*\\-\\,]{1}){1,5}){1}|([3]{1}){1}([0-1]{1}){1})))
+              ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([1-9]{1}){1}|(([1-2]{1}){1}([0-9\\/\\*\\-\\,]{1}){1,}){1}|([3]{1}){1}([0-1]{1}){1}))|(jan|JAN|feb|FEB|mar|MAR|apr|APR|may|MAY|jun|JUN|jul|JUL|aug|AUG|sep|SEP|okt|OKT|nov|NOV|dec|DEC)(-?\\w+?)?)
+              ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([0-7]{1,}(-?[0-7]?(,[0-7]){0,6})){1}))|((sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAR)?(,(sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAT)){0,6})(-?\\w+?)?))$|^(@(reboot|yearly|annualy|monthly|weekly|daily|hourly))$"
+      - type: spinner
+        name: backupCount
+        caption: Number of backups
+        tooltip: "The number of newest backups to be kept during rotation."  
+        min: 1
+        max: 10
+        default: 5
+      - caption: Backup storage
+        type: list
+        tooltip: "The environment with backup storage to be used for backups creation."  
+        name: storageName
+        dependsOn: region
+        
+  restore:
+    fields: []
+    onBeforeInit: scripts/restoreOnBeforeInit.js
+      
+onBeforeInit: scripts/backupOnBeforeInit.js
+
+buttons:
+- caption: Backup Now
+  action: backup
+  loadingText: Backing up...
+  confirmText: Are you you want to initiate the backup process?
+  successText: The backup process has been finished successfully.
+
+- caption: Configure
+  action: configure
+  settings: main
+  loadingText: Configuring...
+  successText: The backup configs have been updated successfully.
+  
+- caption: Restore
+  action: restore
+  loadingText: Restoring...
+  settings: restore
+  successText: The backup had been successfully restored.
+
+globals:
+  scriptSufix: wp-backup
+
+onInstall:
+  - installRestic
+  - setSchedule
+
+onUninstall:
+  callScript: uninstall
+
+onBeforeDelete:
+  callScript: uninstall
+  
+onAfterRedeployContainer[cp]:
+- installRestic
+
+actions:
+  installRestic:
+    cmd [cp]: |-
+      yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/copart/restic/repo/epel-7/copart-restic-epel-7.repo
+      yum-config-manager --enable copr:copr.fedorainfracloud.org:copart:restic
+      yum -y install restic
+      yum-config-manager --disable copr:copr.fedorainfracloud.org:copart:restic
+    user: root
+
+  installScript:
+    - getStorageCtid
+    - script: ${baseUrl}/scripts/create-backup-main-script.js?_r=${fn.random}
+      params:
+        scriptName: ${env.envName}-${globals.scriptSufix}
+        baseUrl: ${baseUrl}
+        cronTime: ${this.cronTime}
+        backupCount: ${this.backupCount}
+        userId: ${env.uid}
+        storageNodeId: ${response.storageCtid}
+        backupExecNode: ${nodes.cp.master.id}
+
+  callScript:
+    script: |-
+      var resp = jelastic.dev.scripting.Eval(appid, session, '${env.envName}-${globals.scriptSufix}', {action:"${this}"})
+      return resp.response || resp;
+
+  backup:
+    - callScript: backup
+    
+  restore:
+    - callScript: uninstall
+    - getStorageCtid
+    - script: |-
+        var umount = jelastic.env.file.RemoveMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup");
+        return jelastic.env.file.AddMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup", 'nfs4', null, '/data/' + '${env.envName}', '${response.storageCtid}', 'WP restore', false);
+    - cmd[${nodes.cp.master.id}]: |-
+        jem service stop
+        ! which mysqld || service mysql start
+        SNAPSHOT_ID=$(RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ snapshots|grep '${settings.backupDir}'|awk '{print $1}')
+        RESTORE_TMP_DIR=$(mktemp -d)
+        RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /
+        for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php |grep ${i}|awk '{print $3}'|tr -d "\'"); done
+        mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/${DB_NAME}.sql
+        rm -rf ${RESTORE_TMP_DIR} /root/${DB_NAME}.sql
+        jem service start
+      user: root
+    - script: |-
+        var umount = jelastic.env.file.RemoveMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup");
+        return {result: 0};
+    - callScript: install
+    
+  configure:
+    - setSchedule
+        
+  getStorageCtid:
+    - script: |-
+        var storageEnv = '${globals.storageEnv}'
+        var storageEnvShortName = storageEnv.split(".")[0]
+        var resp = jelastic.environment.control.GetEnvInfo(storageEnvShortName, session)
+        if (resp.result != 0) return resp
+        for (var i = 0; resp.nodes; i++) {
+            var node = resp.nodes[i]
+            if (node.nodeGroup == 'storage' && node.ismaster) {
+                return { result: 0, storageCtid : node.id};
+            }
+        }
+        
+  convert:
+    - script: |
+        var resp = {result:0, onAfterReturn: {setGlobals:{cron: ""}}}, offset = java.util.TimeZone.getTimeZone("${settings.tz}").getRawOffset(),
+            setGlobals = resp.onAfterReturn.setGlobals;
+        
+        var time = "${settings.backupTime}".split(":"),
+            d1 = new Date(2020, 1, 10, parseInt(time[0],10), parseInt(time[1],10)),
+            d2 = new Date(d1.getTime() - offset),
+            dd = d2.getDate() - d1.getDate(),
+            days = getDays([${settings.sun:0}, ${settings.mon:0}, ${settings.tue:0}, ${settings.wed:0}, ${settings.thu:0}, ${settings.fri:0}, ${settings.sat:0}], dd);
+
+        setGlobals.cron = d2.getMinutes() + " " + d2.getHours() + " * * " + days.join(",");
+
+
+        function getDays(settings, dd) {
+          var days = [];
+          for (var i = 0, n = settings.length; i < n; i++) {
+            if (settings[i]) {
+              var day = i + dd;
+              if (day < 0) day +=7; else if (day > 6) day -=7;
+              days.push(day);
+            }
+          }
+          days.sort();
+          return days;
+        }
+
+        return resp;
+
+  setSchedule:
+    - setGlobals: 
+        storageEnv: ${settings.storageName}
+    - if ("${settings.scheduleType}" == 2):
+      - convert
+    - else:
+      - setGlobals:
+          cron: ${settings.cronTime}
+    - installScript:
+        cronTime: ${globals.cron}
+        backupCount: ${settings.backupCount}
