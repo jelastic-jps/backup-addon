@@ -278,7 +278,16 @@ function BackupManager(config) {
             } else {
                 resp = jelastic.env.control.ExecCmdById(envName, session, values.nodeId, toJSON([{ command: command }]), true, "root");
             }
-
+		
+	    if (resp.result != 0) {
+		var title = "Backup failed for " + config.envName,
+    	    	text = "Backup failed for the environment " + config.envName + " of " + user.email + " with error message " + resp.responses[0].errOut;
+		try {
+    	    	    jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+		} catch (ex) {
+		    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+		}
+	    }
             return resp;
         };
     }
