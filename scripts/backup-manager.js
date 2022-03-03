@@ -75,8 +75,8 @@ function BackupManager(config) {
 		'DUMP_NAME=$(date "+%F-%H-%M-%S")',
 		'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
 	        'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
-		'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > ${DB_NAME}.sql',
-		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag ${DUMP_NAME} %(appPath) ~/${DB_NAME}.sql',
+		'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
+		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag ${DUMP_NAME} %(appPath) ~/wp_db_backup.sql',
 		'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune'
             ], {
                 nodeId : config.backupExecNode,
