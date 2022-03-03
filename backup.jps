@@ -186,7 +186,6 @@ actions:
     - callScript: uninstall
     - getStorageCtid
     - script: |-
-        var umount = jelastic.env.file.RemoveMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup");
         return jelastic.env.file.AddMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup", 'nfs4', null, '/data/' + '${env.envName}', '${response.storageCtid}', 'WP restore', false);
     - cmd[${nodes.cp.master.id}]: |-
         jem service stop
