@@ -186,21 +186,26 @@ actions:
     - callScript: uninstall
     - getStorageCtid
     - script: |-
-        return jelastic.env.file.AddMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup", 'nfs4', null, '/data/' + '${env.envName}', '${response.storageCtid}', 'WP restore', false);
-    - cmd[${nodes.cp.master.id}]: |-
+        return jelastic.env.file.AddMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup", 'nfs4', null, '/data/' + '${env.envName}', '${response.storageCtid}', 'WP restore', false);
+    - cmd[cp]: |-
         jem service stop
-        ! which mysqld || service mysql start
         SNAPSHOT_ID=$(RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ snapshots|grep '${settings.backupDir}'|awk '{print $1}')
         RESTORE_TMP_DIR=$(mktemp -d)
         RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /
         for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php |grep ${i}|awk '{print $3}'|tr -d "\'"); done
-        mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};"
         mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql
-        rm -rf ${RESTORE_TMP_DIR} /root/wp_db_backup.sql
+      user: root
+    - cmd[${nodes.cp.master.id}]: |-
+        ! which mysqld || service mysql start
+        for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php |grep ${i}|awk '{print $3}'|tr -d "\'"); done
+        mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql
+      user: root
+    - cmd[cp]: |-
+        rm -rf ${RESTORE_TMP_DIR} /root/${DB_NAME}.sql
         jem service start
       user: root
     - script: |-
-        var umount = jelastic.env.file.RemoveMountPointById('${env.envName}', session, '${nodes.cp.master.id}', "/opt/backup");
+        var umount = jelastic.env.file.RemoveMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup");
         return {result: 0};
     - callScript: install
     
