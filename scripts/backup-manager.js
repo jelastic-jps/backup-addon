@@ -91,6 +91,7 @@ function BackupManager(config) {
     };
 
     me.addMountForBackup = function addMountForBackup() {
+	var umount = jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
         return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false); 
     }
 
