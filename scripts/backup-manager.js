@@ -79,7 +79,7 @@ function BackupManager(config) {
 		'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
 		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag ${DUMP_NAME} %(appPath) ~/wp_db_backup.sql',
 		'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune',
-		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check --read-data-subset=100M'
+		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check --read-data-subset=1/10'
             ], {
                 nodeId : config.backupExecNode,
                 envName : config.envName,
