@@ -192,8 +192,6 @@ actions:
         SNAPSHOT_ID=$(RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ snapshots|grep '${settings.backupDir}'|awk '{print $1}')
         RESTORE_TMP_DIR=$(mktemp -d)
         RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /
-        for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php |grep ${i}|awk '{print $3}'|tr -d "\'"); done
-        mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql
       user: root
     - cmd[${nodes.cp.master.id}]: |-
         ! which mysqld || service mysql start
