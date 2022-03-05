@@ -108,10 +108,9 @@ function BackupManager(config) {
 	for (var i = 0, n = allMounts.length; i < n; i++) {
             if (mountssss[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
 		return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
-            } else {
-		return { "result": 0 };
-	    }
+            } 
         }
+	return { "result": 0 };
     }
 
     me.checkEnvStatus = function checkEnvStatus() {
