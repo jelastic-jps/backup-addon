@@ -91,7 +91,12 @@ function BackupManager(config) {
     };
 
     me.addMountForBackup = function addMountForBackup() {
-	var umount = jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+	var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
+	for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (mountssss[i].sourcePath == "/data/" + config.envName" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
+		jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+            }
+        }
         return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false); 
     }
 
