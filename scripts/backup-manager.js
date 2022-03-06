@@ -68,6 +68,7 @@ function BackupManager(config) {
 	// todo - transfer getting the params from config and restic cmd to separate functions
         return me.exec([
             [ me.checkEnvStatus ],
+	    [ me.removeMountForBackup ],
 	    [ me.addMountForBackup ],
             [ me.cmd, [
 		'[ -d /opt/backup ] || mkdir -p /opt/backup',
@@ -91,9 +92,6 @@ function BackupManager(config) {
     };
 
     me.addMountForBackup = function addMountForBackup() {
-	me.exec([
-	    [ me.removeMountForBackup ]
-	]);
         return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false); 
     }
 
