@@ -209,7 +209,7 @@ actions:
                 return jelastic.env.file.RemoveMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup");
             }
         }
-	return { "result": 0 };
+        return { "result": 0 };
     - callScript: install
     
   configure:
