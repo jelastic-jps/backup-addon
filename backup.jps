@@ -205,7 +205,7 @@ actions:
     - script: |-
         var allMounts = jelastic.env.file.GetMountPoints('${env.envName}', session, ${nodes.cp.master.id}).array;
         for (var i = 0, n = allMounts.length; i < n; i++) {
-            if (allMounts[i].sourcePath == "/data/" + "${env.envName}" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
+            if (allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
                 return jelastic.env.file.RemoveMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup");
             }
         }
