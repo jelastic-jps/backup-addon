@@ -48,7 +48,7 @@ return {
               "name": "storageNodesCount",
               "caption": "Number of nodes",
               "min": 3,
-              "max": "max",
+              "max": max,
               "increment": 2
             },
             {
