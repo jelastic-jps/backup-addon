@@ -23,7 +23,7 @@ actions:
         settings: 
           clusteredStorage: ${settings.clustered}
           storageNodesCount: ${settings.storageNodesCount:1}
-          storageNodesSize: ${settings.storageSize:10}
+          storageNodesSize: ${settings.storageSize}
     - script: |
         storageEnvGroups = eval('(' + MANIFEST + ')').envGroups;
         if (!Array.isArray(storageEnvGroups)) {
