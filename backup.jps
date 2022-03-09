@@ -6,8 +6,6 @@ targetEditions: wordpress
 logo: /images/backup-logo.png
 description: Backup Add-On for WordPress sites. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
 baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
-categories:
-  - wordpress/extra
 
 targetNodes:
   nodeGroup: cp
@@ -90,7 +88,7 @@ settings:
               values: values
           3:
             - name: cronTime
-              caption: Backup schedule
+              caption: Crontab
               tooltip: "<span>A simple <a href=\"https://en.wikipedia.org/wiki/Cron#Overview\"> cron-based</a>
     scheduler to automatically start the backup process based on prescribed timing
     instructions.</span><div><b>Note</b> that the required timestamps should be specified
@@ -142,7 +140,6 @@ buttons:
   successText: The backup have been successfully restored.
   title: Restore Backup
   submitButtonText: Restore
-  confirmText: You are going to restore from a backup, which will override all your existing data. This action cannot be canceled or reverted. Do you want to proceed?
 
 globals:
   scriptSufix: wp-backup
