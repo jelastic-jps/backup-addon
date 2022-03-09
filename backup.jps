@@ -30,10 +30,14 @@ settings:
               type: list
               editable: false
               values:
-                0 * * * * : "Hourly"
-                0 0 * * * : "Daily"
-                0 0 * * 0 : "Weekly"
-                0 0 1 * * : "Mountly"
+                - value: 0 * * * * 
+                  caption: "Hourly"
+                - value: 0 0 * * * 
+                  caption: "Daily"
+                - value: 0 0 * * 0 
+                  caption: "Weekly"
+                - value: 0 0 1 * *
+                  caption: "Monthly"
               default: 0 0 * * *
           2:
             - type: string
@@ -135,7 +139,9 @@ buttons:
   action: restore
   loadingText: Restoring...
   settings: restore
-  successText: The backup had been successfully restored.
+  successText: The backup have been successfully restored.
+  title: Restore Backup
+  submitButtonText: Restore
 
 globals:
   scriptSufix: wp-backup
