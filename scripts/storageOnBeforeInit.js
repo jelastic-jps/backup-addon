@@ -65,8 +65,8 @@ return {
         "name": "storageSize",
         "caption": "Storage size, GB",
         "min": 5,
-        "max": "maxStorageSize",
-        "default": "maxStorageSize",
+        "max": maxStorageSize,
+        "default": maxStorageSize,
         "increment": 1
       },
       {
