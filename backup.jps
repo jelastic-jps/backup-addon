@@ -18,9 +18,16 @@ settings:
         hidden: false
         default: '1'
         values:
-          1: Pre-defined
-          2: Custom
-          3: Manual (crontab)
+          - value: 1 
+            caption: Pre-defined
+          - value: 2 
+            caption: Custom
+          - value: 3 
+            caption: Manual (crontab)
+            tooltip: "<span>A simple <a href=\"https://en.wikipedia.org/wiki/Cron#Overview\" target=\"_blank\"> cron-based</a>
+    scheduler to automatically start the backup process based on prescribed timing
+    instructions.</span><div><b>Note</b> that the required timestamps should be specified
+    respectively to the UTC time zone.</div>" 
         showIf:
           1:
             - name: cronTime
@@ -88,11 +95,7 @@ settings:
               values: values
           3:
             - name: cronTime
-              caption: Crontab
-              tooltip: "<span>A simple <a href=\"https://en.wikipedia.org/wiki/Cron#Overview\"> cron-based</a>
-    scheduler to automatically start the backup process based on prescribed timing
-    instructions.</span><div><b>Note</b> that the required timestamps should be specified
-    respectively to the UTC time zone.</div>"              
+              caption: Crontab             
               type: string
               default: 0 0 * * *
               regexText: Cron syntax is incorrect!
