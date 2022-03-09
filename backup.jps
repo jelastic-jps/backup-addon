@@ -142,6 +142,7 @@ buttons:
   successText: The backup have been successfully restored.
   title: Restore Backup
   submitButtonText: Restore
+  confirmText: You are going to restore from a backup, which will override all your existing data. This action cannot be canceled or reverted. Do you want to proceed?
 
 globals:
   scriptSufix: wp-backup
