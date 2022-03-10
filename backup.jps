@@ -90,7 +90,6 @@ settings:
               caption: "Time Zone"
               type: "list"
               required: true
-              width: 250
               editable: false
               values: values
           3:
