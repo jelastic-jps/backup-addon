@@ -116,6 +116,7 @@ settings:
         tooltip: "The environment with backup storage to be used for backups creation."  
         name: storageName
         dependsOn: region
+        required: true
         
   restore:
     fields: []
