@@ -26,7 +26,7 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
 }
 
 if (envs.length > 0) {
-    jps.settings.main.fields[2].values = envs;
+    jps.settings.main.fields[1].values = envs;
 }
       
 import java.util.TimeZone;
