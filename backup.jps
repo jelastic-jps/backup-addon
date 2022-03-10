@@ -90,6 +90,7 @@ settings:
               caption: "Time Zone"
               type: "list"
               required: true
+              width: 250
               editable: false
               values: values
           3:
@@ -102,7 +103,13 @@ settings:
               ((([\\\\*]{1}){1,})|((\\\\*\\\\\\/){0,1}(([0-9\\/\\*\\-\\,]{1}){1,}|(([1]{1}){1}([0-9\\/\\*\\-\\,-]{1}){1,}){1}|([2]{1}){1}([0-3]{1}){1})))
               ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([1-9]{1}){1}|(([1-2]{1}){1}([0-9\\/\\*\\-\\,]{1}){1,5}){1}|([3]{1}){1}([0-1]{1}){1})))
               ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([1-9]{1}){1}|(([1-2]{1}){1}([0-9\\/\\*\\-\\,]{1}){1,}){1}|([3]{1}){1}([0-1]{1}){1}))|(jan|JAN|feb|FEB|mar|MAR|apr|APR|may|MAY|jun|JUN|jul|JUL|aug|AUG|sep|SEP|okt|OKT|nov|NOV|dec|DEC)(-?\\w+?)?)
-              ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([0-7]{1,}(-?[0-7]?(,[0-7]){0,6})){1}))|((sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAR)?(,(sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAT)){0,6})(-?\\w+?)?))$|^(@(reboot|yearly|annualy|monthly|weekly|daily|hourly))$"
+              ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([0-7]{1,}(-?[0-7]?(,[0-7]){0,6})){1}))|((sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAT)?(,(sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAT)){0,6})(-?\\w+?)?))$|^(@(reboot|yearly|annualy|monthly|weekly|daily|hourly))$"
+      - caption: Backup storage
+        type: list
+        tooltip: "The environment with backup storage to be used for backups creation."  
+        name: storageName
+        dependsOn: region
+        required: true
       - type: spinner
         name: backupCount
         caption: Number of backups
@@ -110,12 +117,6 @@ settings:
         min: 1
         max: 10
         default: 5
-      - caption: Backup storage
-        type: list
-        tooltip: "The environment with backup storage to be used for backups creation."  
-        name: storageName
-        dependsOn: region
-        required: true
         
   restore:
     fields: []
