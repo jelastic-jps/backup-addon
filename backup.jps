@@ -1,10 +1,10 @@
 type: update
 jpsVersion: 7.1.1
-name: Backup/Restore for WordPress Sites
+name: Backup/Restore for the filesystem and the databases
 id: wp-backup
 targetEditions: wordpress
 logo: /images/backup-logo.png
-description: Backup Add-On for WordPress sites. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
+description: Backup Add-On for the filesystem and the databases. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
 baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
 
 targetNodes:
