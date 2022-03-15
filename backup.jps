@@ -193,31 +193,10 @@ actions:
   restore:
     - callScript: uninstall
     - getStorageCtid
-    - script: |-
-        var allMounts = jelastic.env.file.GetMountPoints('${env.envName}', session, ${nodes.cp.master.id}).array;
-        for (var i = 0, n = allMounts.length; i < n; i++) {
-            if (allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup") {
-                jelastic.env.file.RemoveMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup");
-            }
-        }
-        return jelastic.env.file.AddMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup", 'nfs4', null, '/data/' + '${env.envName}', '${response.storageCtid}', 'WP restore', false);
     - cmd[cp]: |-
-        jem service stop
-        SNAPSHOT_ID=$(RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ snapshots|grep '${settings.backupDir}'|awk '{print $1}')
-        RESTORE_TMP_DIR=$(mktemp -d)
-        RESTIC_PASSWORD="${env.name}" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /
+        echo "${settings.backupDir}" > /root/.backupid
       user: root
-    - cmd[${nodes.cp.master.id}]: |-
-        ! which mysqld || service mysql start
-        for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php |grep ${i}|awk '{print $3}'|tr -d "\'"); done
-        mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql
-      user: root
-    - cmd[cp]: |-
-        rm -rf ${RESTORE_TMP_DIR} /root/${DB_NAME}.sql
-        jem service start
-      user: root
-    - script: |-
-        return jelastic.env.file.RemoveMountPointByGroup('${env.envName}', session, 'cp', "/opt/backup");
+    - callScript: restore
     - callScript: install
     
   configure:
