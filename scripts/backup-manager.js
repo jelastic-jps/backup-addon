@@ -1,6 +1,6 @@
 function BackupManager(config) {
     /**
-     * Implements backup management of the Jahia environment
+     * Implements backup management of the environment data
      * @param {{
      *  session : {String}
      *  baseUrl : {String}
@@ -37,7 +37,8 @@ function BackupManager(config) {
         var actions = {
             "install"         : me.install,
             "uninstall"       : me.uninstall,
-            "backup"          : me.backup
+            "backup"          : me.backup,
+            "restore"         : me.restore
         };
 
         if (!actions[action]) {
@@ -65,44 +66,77 @@ function BackupManager(config) {
     };
 
     me.backup = function () {
-	// todo - transfer getting the params from config and restic cmd to separate functions
+    // todo - transfer getting the params from config and restic cmd to separate functions
         return me.exec([
             [ me.checkEnvStatus ],
-	    [ me.removeMountForBackup ],
-	    [ me.addMountForBackup ],
+        [ me.removeMountForBackup ],
+        [ me.addMountForBackup ],
             [ me.cmd, [
-		'[ -d /opt/backup ] || mkdir -p /opt/backup',
-		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup snapshots || RESTIC_PASSWORD=%(envName) restic init -r /opt/backup',
-		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check',
-		'DUMP_NAME=$(date "+%F-%H-%M-%S")',
-		'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
-	        'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
-		'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
-		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag ${DUMP_NAME} %(appPath) ~/wp_db_backup.sql',
-		'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune',
-		'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check --read-data-subset=1/10'
+        	'[ -d /opt/backup ] || mkdir -p /opt/backup',
+        	'RESTIC_PASSWORD=%(envName) restic -r /opt/backup snapshots || RESTIC_PASSWORD=%(envName) restic init -r /opt/backup',
+        	'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check',
+        	'DUMP_NAME=$(date "+%F-%H-%M-%S")',
+        	'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
+            	'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
+        	'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
+        	'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag ${DUMP_NAME} %(appPath) ~/wp_db_backup.sql',
+        	'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune',
+        	'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check --read-data-subset=1/10'
             ], {
                 nodeId : config.backupExecNode,
                 envName : config.envName,
-		appPath : "/var/www/webroot/ROOT",
-		backupCount : config.backupCount
+        appPath : "/var/www/webroot/ROOT",
+        backupCount : config.backupCount
             }],
-	    [ me.removeMountForBackup ]
+        [ me.removeMountForBackup ]
         ]);
     };
+    
+    me.restore = function () {
+        return me.exec([
+            [ me.checkEnvStatus ],
+        [ me.removeMountForBackup ],
+        [ me.addMountForBackup ],
+            [ me.cmd, [
+                'jem service stop',
+                'SNAPSHOT_ID=$(RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')',
+                'RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /'
+            ], {
+                nodeGroup : "cp",
+                envName : config.envName
+            }],
+            [ me.cmd, [
+                '! which mysqld || service mysql start',
+                'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
+                'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
+            ], {
+                nodeId : config.backupExecNode,
+                envName : config.envName,
+                appPath : "/var/www/webroot/ROOT"
+            }],
+            [ me.cmd, [
+                'rm -f /root/.backupid /root/wp_db_backup.sql',
+                'jem service start'
+            ], {
+                nodeGroup : "cp",
+                envName : config.envName
+            }],
+        [ me.removeMountForBackup ]
+    ]);
+    }
 
     me.addMountForBackup = function addMountForBackup() {
-        return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false); 
+        return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false);
     }
 
     me.removeMountForBackup = function removeMountForBackup() {
-	var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
-	for (var i = 0, n = allMounts.length; i < n; i++) {
+    var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
+    for (var i = 0, n = allMounts.length; i < n; i++) {
             if (allMounts[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
-		return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
-            } 
+        return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+            }
         }
-	return { "result": 0 };
+    return { "result": 0 };
     }
 
     me.checkEnvStatus = function checkEnvStatus() {
@@ -286,16 +320,16 @@ function BackupManager(config) {
             } else {
                 resp = jelastic.env.control.ExecCmdById(envName, session, values.nodeId, toJSON([{ command: command }]), true, "root");
             }
-		
-	    if (resp.result != 0) {
-		var title = "Backup failed for " + config.envName,
-    	    	text = "Backup failed for the environment " + config.envName + " of " + user.email + " with error message " + resp.responses[0].errOut;
-		try {
-    	    	    jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-		} catch (ex) {
-		    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-		}
-	    }
+        
+        if (resp.result != 0) {
+        var title = "Backup failed for " + config.envName,
+                text = "Backup failed for the environment " + config.envName + " of " + user.email + " with error message " + resp.responses[0].errOut;
+        try {
+                    jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+        } catch (ex) {
+            emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+        }
+        }
             return resp;
         };
     }
