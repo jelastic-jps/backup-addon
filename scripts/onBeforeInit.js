@@ -23,7 +23,7 @@
         "name": "backupCount",
         "caption": "N of stored backups",
         "min": 1,
-        "max": 10,
+        "max": 30,
         "default": 5
       }]
     }
