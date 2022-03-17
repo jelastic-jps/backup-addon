@@ -1,0 +1,8 @@
+/var/log/backup_addon.log {
+    weekly
+    rotate 52
+    missingok
+    notifempty
+    compress
+    copytruncate
+}
