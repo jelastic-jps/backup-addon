@@ -36,13 +36,13 @@ settings:
               editable: false
               values:
                 - value: 0 * * * * 
-                  caption: "Hourly"
+                  caption: "Hourly (at minute 0)"
                 - value: 0 0 * * * 
-                  caption: "Daily"
+                  caption: "Daily (at 00:00)"
                 - value: 0 0 * * 0 
-                  caption: "Weekly"
+                  caption: "Weekly (at 00:00 on Sunday)"
                 - value: 0 0 1 * *
-                  caption: "Monthly"
+                  caption: "Monthly (at 00:00 on day 1)"
               default: 0 0 * * *
           2:
             - type: string
