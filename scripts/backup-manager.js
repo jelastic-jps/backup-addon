@@ -83,7 +83,7 @@ function BackupManager(config) {
                 'BACKUP_ADDON_REPO=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $1"/"$2}\')',
                 'BACKUP_ADDON_BRANCH=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $3}\')',
                 'BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk \'{print $1}\')',
-                'echo $(date) "Creating the backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID})" | tee -a %(backupLogFile)',
+                'echo $(date) "Creating the %(backupType) backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID})" | tee -a %(backupLogFile)',
                 '[ -d /opt/backup ] || mkdir -p /opt/backup',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup snapshots || RESTIC_PASSWORD=%(envName) restic init -r /opt/backup',
                 'echo "Checking the backup repository integrity and consistency before adding the new snapshot" | tee -a %(backupLogFile)',
