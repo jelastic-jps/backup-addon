@@ -3,7 +3,7 @@ jpsVersion: 7.1.1
 name: Backup Storage	
 id: wp-restore
 targetEditions: wordpress
-logo: /images/backup-logo.png	
+logo: /images/backup-logo.svg	
 description: Create a centralized storage repository for backups of the filesystem and the database. It can be as a single node or multi-node fault-tolerant scalable GlusterFS cluster. Backup storage can keep multiple backups of numerous containers created under a single account.
 baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
 categories:
