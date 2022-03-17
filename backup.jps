@@ -105,7 +105,7 @@ settings:
               ((([\\\\*]{1}){1})|((\\\\*\\\\\\/){0,1}(([0-7]{1,}(-?[0-7]?(,[0-7]){0,6})){1}))|((sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAT)?(,(sun|SUN|mon|MON|tue|TUE|wed|WED|thu|THU|fri|FRI|sat|SAT)){0,6})(-?\\w+?)?))$|^(@(reboot|yearly|annualy|monthly|weekly|daily|hourly))$"
       - caption: Backup storage
         type: list
-        tooltip: "The environment with backup storage to be used for backups creation."  
+        tooltip: "The environment with backup storage to be used for backups creation. Presence of this environment is obligatory."  
         name: storageName
         dependsOn: region
         required: true
