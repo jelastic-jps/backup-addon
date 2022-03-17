@@ -1,6 +1,6 @@
 function BackupManager(config) {
     /**
-     * Implements backup management of the Jahia environment
+     * Implements backup management of the environment data
      * @param {{
      *  session : {String}
      *  baseUrl : {String}
