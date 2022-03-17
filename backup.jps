@@ -168,6 +168,7 @@ actions:
       yum-config-manager --enable copr:copr.fedorainfracloud.org:copart:restic
       yum -y install restic
       yum-config-manager --disable copr:copr.fedorainfracloud.org:copart:restic
+      wget -O /etc/logrotate.d/backup-addon ${baseUrl}/scripts/backup-addon;
     user: root
 
   installScript:
