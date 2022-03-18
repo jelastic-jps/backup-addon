@@ -88,7 +88,7 @@ function BackupManager(config) {
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup snapshots || RESTIC_PASSWORD=%(envName) restic init -r /opt/backup',
                 'echo "Checking the backup repository integrity and consistency before adding the new snapshot" | tee -a %(backupLogFile)',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check | tee -a %(backupLogFile)',
-                'DUMP_NAME=$(date "+%F-%H-%M-%S")',
+                'DUMP_NAME=$(date "+%F_%H%M%S")',
                 'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
                 'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
                 'echo "Creating the DB dump" | tee -a %(backupLogFile)', 
