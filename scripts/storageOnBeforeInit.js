@@ -25,7 +25,7 @@ for (var i = 0, n = quotas.length; i < n; i++) {
     if (name == MAX_NODES) max = value ? value - 1 : 1;
       else if (name == SAME_NODES) max = value;
   }
-  if (name == STORAGE_NODE_DISK_LIMITATION) maxStorageSize = parseInt(value/1024);
+  if (name == STORAGE_NODE_DISK_LIMITATION) maxStorageSize = parseInt(value/1000);
 }
 
 return {
