@@ -78,7 +78,6 @@ function BackupManager(config) {
         
         return me.exec([
             [ me.checkEnvStatus ],
-            [ me.checkStorageEnvStatus ],
             [ me.removeMountForBackup ],
             [ me.addMountForBackup ],
             [ me.cmd, [
@@ -118,7 +117,6 @@ function BackupManager(config) {
     me.restore = function () {
         return me.exec([
             [ me.checkEnvStatus ],
-            [ me.checkStorageEnvStatus ],
             [ me.removeMountForBackup ],
             [ me.addMountForBackup ],
             [ me.cmd, [
