@@ -11,7 +11,7 @@ function BackupManager(config) {
      *  envAppid : {String}
      *  storageNodeId : {String}
      *  backupExecNode : {String}
-     *  storageEnv : {String}
+     *  [storageEnv] : {String}
      *  [backupCount] : {String}
      * }} config
      * @constructor
