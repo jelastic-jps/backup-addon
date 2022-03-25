@@ -7,7 +7,9 @@ var scriptName        = getParam("scriptName", "${env.envName}-wp-backup"),
     userId            = getparam("userId", ""),
     backupCount       = getParam("backupCount", "5"),
     storageNodeId     = getParam("storageNodeId"),
-    backupExecNode    = getParam("backupExecNode");
+    backupExecNode    = getParam("backupExecNode"),
+    storageEnv        = getParam("storageEnv");
+    
 
 function run() {
     var BackupManager = use("scripts/backup-manager.js", {
@@ -20,7 +22,8 @@ function run() {
         envAppid          : envAppid,
         backupCount       : backupCount,
         storageNodeId     : storageNodeId,
-        backupExecNode    : backupExecNode
+        backupExecNode    : backupExecNode,
+        storageEnv        : storageEnv
     });
 
     jelastic.local.ReturnResult(

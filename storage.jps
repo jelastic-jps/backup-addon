@@ -20,6 +20,7 @@ actions:
         jps: ${baseUrl}/storage-topology.jps
         envName: ${settings.envName}
         displayName: WP Backup Storage Server
+        region: ${settings.regions}
         settings: 
           clusteredStorage: ${settings.clustered}
           storageNodesCount: ${settings.storageNodesCount:1}

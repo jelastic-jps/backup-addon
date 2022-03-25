@@ -11,6 +11,7 @@ function BackupManager(config) {
      *  envAppid : {String}
      *  storageNodeId : {String}
      *  backupExecNode : {String}
+     *  storageEnv : {String}
      *  [backupCount] : {String}
      * }} config
      * @constructor
@@ -77,6 +78,7 @@ function BackupManager(config) {
         
         return me.exec([
             [ me.checkEnvStatus ],
+            [ me.checkStorageEnvStatus ],
             [ me.removeMountForBackup ],
             [ me.addMountForBackup ],
             [ me.cmd, [
@@ -91,9 +93,10 @@ function BackupManager(config) {
                 'DUMP_NAME=$(date "+%F_%H%M%S")',
                 'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
                 'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
-                'echo "Creating the DB dump" | tee -a %(backupLogFile)', 
+                'echo "Creating the DB dump" | tee -a %(backupLogFile)',
                 'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
-                'echo "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a %(backupLogFile)',     
+                'echo "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a %(backupLogFile)',
+                'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status || service mysql start; fi',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} %(backupType)" %(appPath) ~/wp_db_backup.sql | tee -a %(backupLogFile)',
                 'echo "Rotating snapshots by keeping the last %(backupCount)" | tee -a %(backupLogFile)',    
                 'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune | tee -a %(backupLogFile)',
@@ -115,11 +118,13 @@ function BackupManager(config) {
     me.restore = function () {
         return me.exec([
             [ me.checkEnvStatus ],
+            [ me.checkStorageEnvStatus ],
             [ me.removeMountForBackup ],
             [ me.addMountForBackup ],
             [ me.cmd, [
                 'jem service stop',
                 'SNAPSHOT_ID=$(RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')',
+                '[ -n "SNAPSHOT_ID" ] || false',
                 'RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /'
             ], {
                 nodeGroup : "cp",
@@ -128,10 +133,13 @@ function BackupManager(config) {
             [ me.cmd, [
                 '! which mysqld || service mysql start',
                 'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
+                'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi',
+                'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"',
                 'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
             ], {
                 nodeId : config.backupExecNode,
                 envName : config.envName,
+                baseUrl : config.baseUrl,
                 appPath : "/var/www/webroot/ROOT"
             }],
             [ me.cmd, [
@@ -167,6 +175,16 @@ function BackupManager(config) {
             };
         }
 
+        return { result : 0 };
+    };
+    
+    me.checkStorageEnvStatus = function checkStorageEnvStatus() {
+        if (!nodeManager.isStorageEnvRunning()) {
+            return {
+                result : EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
+                error : _("Storage env [%(name)] not running", {name : config.storageEnv})
+            };
+        }
         return { result : 0 };
     };
 
@@ -293,9 +311,10 @@ function BackupManager(config) {
         return resp;
     };
 
-    function NodeManager(envName, nodeId, baseDir, logPath) {
+    function NodeManager(envName, storageEnv, nodeId, baseDir, logPath) {
         var ENV_STATUS_TYPE_RUNNING = 1,
             me = this,
+            storageEnvInfo,
             envInfo;
 
         me.isEnvRunning = function () {
@@ -305,6 +324,16 @@ function BackupManager(config) {
                 throw new Error("can't get environment info: " + toJSON(resp));
             }
 
+            return resp.env.status == ENV_STATUS_TYPE_RUNNING;
+        };
+        
+        me.isStorageEnvRunning = function () {
+            var resp = me.getStorageEnvInfo();
+            if (resp.result === 11){
+                throw new Error("Storage environment " + config.storageEnv + " is deleted");
+            } else if (resp.result != 0) {
+                throw new Error("can't get environment info: " + toJSON(resp));
+            }
             return resp.env.status == ENV_STATUS_TYPE_RUNNING;
         };
 
@@ -319,6 +348,15 @@ function BackupManager(config) {
             }
 
             return envInfo;
+        };
+        
+        me.getStorageEnvInfo = function () {
+            var resp;
+            if (!storageEnvInfo) {
+                resp = jelastic.env.control.GetEnvInfo(config.storageEnv, session);
+                storageEnvInfo = resp;
+            }
+            return storageEnvInfo;
         };
 
         me.cmd = function (cmd, values, sep, disableLogging) {

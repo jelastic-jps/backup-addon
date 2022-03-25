@@ -127,7 +127,7 @@ buttons:
 - caption: Backup Now
   action: backup
   loadingText: Backing up...
-  confirmText: Are you you want to initiate the backup process?
+  confirmText: Do you want to initiate the backup process?
   successText: The backup process has been finished successfully.
 
 - caption: Configure
@@ -182,6 +182,7 @@ actions:
         userId: ${env.uid}
         storageNodeId: ${response.storageCtid}
         backupExecNode: ${nodes.cp.master.id}
+        storageEnv: ${response.storageEnvShortName}
 
   callScript:
     script: |-
@@ -212,7 +213,7 @@ actions:
         for (var i = 0; resp.nodes; i++) {
             var node = resp.nodes[i]
             if (node.nodeGroup == 'storage' && node.ismaster) {
-                return { result: 0, storageCtid : node.id};
+                return { result: 0, storageCtid : node.id, storageEnvShortName : storageEnvShortName};
             }
         }
         
