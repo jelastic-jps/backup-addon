@@ -78,6 +78,7 @@ function BackupManager(config) {
         
         return me.exec([
             [ me.checkEnvStatus ],
+            [ me.checkStorageEnvStatus ],
             [ me.removeMountForBackup ],
             [ me.addMountForBackup ],
             [ me.cmd, [
@@ -117,6 +118,7 @@ function BackupManager(config) {
     me.restore = function () {
         return me.exec([
             [ me.checkEnvStatus ],
+            [ me.checkStorageEnvStatus ],
             [ me.removeMountForBackup ],
             [ me.addMountForBackup ],
             [ me.cmd, [
@@ -177,11 +179,14 @@ function BackupManager(config) {
     };
     
     me.checkStorageEnvStatus = function checkStorageEnvStatus() {
-        if (!nodeManager.isStorageEnvRunning()) {
-            return {
-                result : EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
-                error : _("Storage env [%(name)] not running", {name : config.storageEnv})
-            };
+        if(typeof config.storageEnv !== 'undefined'){
+            if (!nodeManager.isStorageEnvRunning()) {
+                return {
+                    result : EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
+                    error : _("Storage env [%(name)] not running", {name : config.storageEnv})
+                };
+            }
+            return { result : 0 };
         }
         return { result : 0 };
     };
