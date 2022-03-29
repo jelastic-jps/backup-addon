@@ -79,7 +79,7 @@ function BackupManager(config) {
         return me.exec([
             [ me.checkEnvStatus ],
             [ me.checkStorageEnvStatus ],
-            [ me.removeMountForBackup ],
+            [ me.removeMounts ],
             [ me.addMountForBackup ],
             [ me.cmd, [
                 'BACKUP_ADDON_REPO=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $1"/"$2}\')',
@@ -111,7 +111,7 @@ function BackupManager(config) {
                 baseUrl : config.baseUrl,
                 backupType : backupType
             }],
-        [ me.removeMountForBackup ]
+        [ me.removeMounts ]
         ]);
     };
     
@@ -119,8 +119,8 @@ function BackupManager(config) {
         return me.exec([
             [ me.checkEnvStatus ],
             [ me.checkStorageEnvStatus ],
-            [ me.removeMountForBackup ],
-            [ me.addMountForBackup ],
+            [ me.removeMounts ],
+            [ me.addMountForRestore ],
             [ me.cmd, [
                 'jem service stop',
                 'SNAPSHOT_ID=$(RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')',
@@ -149,19 +149,26 @@ function BackupManager(config) {
                 nodeGroup : "cp",
                 envName : config.envName
             }],
-        [ me.removeMountForBackup ]
+        [ me.removeMounts ]
     ]);
     }
 
     me.addMountForBackup = function addMountForBackup() {
         return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false);
     }
+    
+    me.addMountForRestore = function addMountForRestore() {
+        return jelastic.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP restore', false);
+    }
 
-    me.removeMountForBackup = function removeMountForBackup() {
+    me.removeMounts = function removeMountForBackup() {
     var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
     for (var i = 0, n = allMounts.length; i < n; i++) {
             if (allMounts[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
-        return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+                return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+            }
+            if (allMounts[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP restore" && allMounts[i].type == "INTERNAL") {
+                return jelastic.env.file.RemoveMountPointByGroup(config.envName, session, "cp", "/opt/backup");
             }
         }
     return { "result": 0 };
