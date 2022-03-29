@@ -206,13 +206,11 @@ actions:
     - callScript: backup
     
   restore:
-    - callScript: uninstall
     - getStorageCtid
     - cmd[cp]: |-
         echo "${settings.backupDir}" > /root/.backupid
       user: root
     - callScript: restore
-    - callScript: install
     
   configure:
     - setSchedule
