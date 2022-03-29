@@ -15,7 +15,7 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
                     caption: (node.displayName || node.name) + ' (' + node.nodeGroup + ')'
                 });
                 nodes[env.envName].groups[node.nodeGroup] = true;
-                    if ( env.envName == '${globals.storageEnv}' ) {
+                if ( env.envName == '${globals.storageEnv}' ) {
                     currentStorageExists = true;
                 }
             }
