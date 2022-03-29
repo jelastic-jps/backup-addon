@@ -2,6 +2,7 @@ var resp = jelastic.env.control.GetEnvs();
 if (resp.result !== 0) return resp;
 var envs = [];
 var nodes = {};
+var currentStorageExists = false;
 for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
     if (envInfo.envGroups.includes("WP Backup")) {
         env = envInfo.env
@@ -14,6 +15,9 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
                     caption: (node.displayName || node.name) + ' (' + node.nodeGroup + ')'
                 });
                 nodes[env.envName].groups[node.nodeGroup] = true;
+                    if ( env.envName == '${globals.storageEnv}' ) {
+                    currentStorageExists = true;
+                }
             }
             if (nodes[env.envName] && nodes[env.envName].length > 0) {
                 envs.push({
@@ -27,7 +31,11 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
 
 if (envs.length > 0) {
     jps.settings.main.fields[1].values = envs;
-    jps.settings.main.fields[1].default = '${globals.storageEnv}';
+    if (currentStorageExists == true) {
+        jps.settings.main.fields[1].default = '${globals.storageEnv}';
+    } else {
+        jps.settings.main.fields[1].default = envs[0].value;
+    }
 }
       
 import java.util.TimeZone;
