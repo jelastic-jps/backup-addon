@@ -124,7 +124,7 @@ function BackupManager(config) {
             [ me.cmd, [
                 'jem service stop',
                 'SNAPSHOT_ID=$(RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')',
-                '[ -n "SNAPSHOT_ID" ] || false',
+                '[ -n "${SNAPSHOT_ID}" ] || false',
                 'RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ restore ${SNAPSHOT_ID} --target /'
             ], {
                 nodeGroup : "cp",
