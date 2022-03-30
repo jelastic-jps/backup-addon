@@ -3,6 +3,7 @@ if (resp.result !== 0) return resp;
 var envs = [];
 var nodes = {};
 var currentStorageExists = false;
+var scheduleType = '${settings.scheduleType}';
 for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
     if (envInfo.envGroups.includes("WP Backup")) {
         env = envInfo.env
@@ -51,8 +52,70 @@ for (var i = 0, n = zones.length; i < n; i++) {
   if (Math.abs(h) < 10) h = h < 0 ? "-0" + Math.abs(h) : "+0" + h; else if (h >= 0) h = "+" + h;
   values[zones[i]] = zones[i] + (zones[i] == "GMT" ? "" : " (GMT" + h + ":" + m + ")");
 }
-      
-settings.fields[0].showIf[2][2].values = values;
-settings.fields[0].showIf[2][2].value = values[0];
-      
+
+jps.settings.main.fields[0].default = '${settings.scheduleType}';
+
+if (scheduleType == '1') {
+    jps.settings.main.fields[0].showIf[1][0].default = '${settings.cronTime}';
+} else if (scheduleType == '2') {
+    jps.settings.main.fields[0].showIf[2][0].default = '${settings.backupTime}';
+    var selectedDays = {
+      "caption": "Days",
+      "type": "compositefield",
+      "name": "days",
+      "defaultMargins": "0 12 0 0",
+      "items": [
+        {
+          "name": "sun",
+          "value": ${settings.sun},
+          "type": "checkbox",
+          "caption": "Su"
+        },
+        {
+          "name": "mon",
+          "value": ${settings.mon},
+          "type": "checkbox",
+          "caption": "Mo"
+        },
+        {
+          "name": "tue",
+          "value": ${settings.tue},
+          "type": "checkbox",
+          "caption": "Tu"
+        },
+        {
+          "name": "wed",
+          "value": ${settings.wed},
+          "type": "checkbox",
+          "caption": "We"
+        },
+        {
+          "name": "thu",
+          "value": ${settings.thu},
+          "type": "checkbox",
+          "caption": "Th"
+        },
+        {
+          "name": "fri",
+          "value": ${settings.fri},
+          "type": "checkbox",
+          "caption": "Fr"
+        },
+        {
+          "name": "sat",
+          "value": ${settings.sat},
+          "type": "checkbox",
+          "caption": "Sa"
+        }
+      ]
+    };
+    jps.settings.main.fields[0].showIf[2][1] = selectedDays;
+    jps.settings.main.fields[0].showIf[2][2].values = values;
+    jps.settings.main.fields[0].showIf[2][2].value = '${settings.tz}';    
+} else {
+    jps.settings.main.fields[0].showIf[3][0].default = '${settings.cronTime}';
+}
+
+jps.settings.main.fields[2].default = '${settings.backupCount}';
+
 return settings;
