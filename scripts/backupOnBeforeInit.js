@@ -45,7 +45,7 @@ for (var i = 0, n = zones.length; i < n; i++) {
 }
       
 jps.settings.main.fields[0].showIf[2][2].values = values;
-jps.settings.main.fields[0].showIf[2][2].value = values[0];
+jps.settings.main.fields[0].showIf[2][2].value = "GMT0";
       
 return {
     result: 0,
