@@ -16,7 +16,7 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
                     caption: (node.displayName || node.name) + ' (' + node.nodeGroup + ')'
                 });
                 nodes[env.envName].groups[node.nodeGroup] = true;
-                if ( env.envName == '${globals.storageEnv}' ) {
+                if ( env.envName == '${settings.storageName}' ) {
                     currentStorageExists = true;
                 }
             }
@@ -33,7 +33,7 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
 if (envs.length > 0) {
     jps.settings.main.fields[1].values = envs;
     if (currentStorageExists == true) {
-        jps.settings.main.fields[1].default = '${globals.storageEnv}';
+        jps.settings.main.fields[1].default = '${settings.storageName}';
     } else {
         jps.settings.main.fields[1].default = envs[0].value;
     }
