@@ -80,7 +80,7 @@ function BackupManager(config) {
             [ me.checkEnvStatus ],
             [ me.checkStorageEnvStatus ],
             [ me.removeMounts ],
-            [ me.addMountForBackup ],
+            [ me.addMountForBackupRestore ],
             [ me.cmd, [
                 'BACKUP_ADDON_REPO=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $1"/"$2}\')',
                 'BACKUP_ADDON_BRANCH=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $3}\')',
@@ -120,7 +120,7 @@ function BackupManager(config) {
             [ me.checkEnvStatus ],
             [ me.checkStorageEnvStatus ],
             [ me.removeMounts ],
-            [ me.addMountForRestore ],
+            [ me.addMountForBackupRestore ],
             [ me.cmd, [
                 'jem service stop',
                 'SNAPSHOT_ID=$(RESTIC_PASSWORD="%(envName)" restic -r /opt/backup/ snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')',
@@ -153,25 +153,30 @@ function BackupManager(config) {
     ]);
     }
 
-    me.addMountForBackup = function addMountForBackup() {
-        return jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP backup', false);
-    }
-    
-    me.addMountForRestore = function addMountForRestore() {
-        return jelastic.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WP restore', false);
+    me.addMountForBackupRestore = function addMountForBackupRestore() {
+        var resp = jelastic.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/' + config.envName, config.storageNodeId, 'WPBackupRestore', false);
+        if (resp.result != 0) {
+            var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+            try {
+                jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+            } catch (ex) {
+                emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+            }
+        }
+        return resp;
     }
 
     me.removeMounts = function removeMountForBackup() {
-    var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
-    for (var i = 0, n = allMounts.length; i < n; i++) {
-            if (allMounts[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP backup" && allMounts[i].type == "INTERNAL") {
-                return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
-            }
-            if (allMounts[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WP restore" && allMounts[i].type == "INTERNAL") {
+        var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
+        for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (allMounts[i].sourcePath == "/data/" + config.envName && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
                 return jelastic.env.file.RemoveMountPointByGroup(config.envName, session, "cp", "/opt/backup");
             }
         }
-    return { "result": 0 };
+        return {
+            "result": 0
+        };
     }
 
     me.checkEnvStatus = function checkEnvStatus() {
