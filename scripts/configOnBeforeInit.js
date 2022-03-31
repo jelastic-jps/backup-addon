@@ -59,6 +59,13 @@ if (scheduleType == '1') {
     jps.settings.main.fields[0].showIf[1][0].default = '${settings.cronTime}';
 } else if (scheduleType == '2') {
     jps.settings.main.fields[0].showIf[2][0].default = '${settings.backupTime}';
+    var sun = ('${settings.sun}' === 'true'), 
+        mon = ('${settings.mon}' === 'true'), 
+        tue = ('${settings.tue}' === 'true'), 
+        wed = ('${settings.wed}' === 'true'), 
+        thu = ('${settings.thu}' === 'true'), 
+        fri = ('${settings.fri}' === 'true'), 
+        sat = ('${settings.sat}' === 'true');
     var selectedDays = {
       "caption": "Days",
       "type": "compositefield",
@@ -67,43 +74,43 @@ if (scheduleType == '1') {
       "items": [
         {
           "name": "sun",
-          "value": ${settings.sun},
+          "value": sun,
           "type": "checkbox",
           "caption": "Su"
         },
         {
           "name": "mon",
-          "value": ${settings.mon},
+          "value": mon,
           "type": "checkbox",
           "caption": "Mo"
         },
         {
           "name": "tue",
-          "value": ${settings.tue},
+          "value": tue,
           "type": "checkbox",
           "caption": "Tu"
         },
         {
           "name": "wed",
-          "value": ${settings.wed},
+          "value": wed,
           "type": "checkbox",
           "caption": "We"
         },
         {
           "name": "thu",
-          "value": ${settings.thu},
+          "value": thu,
           "type": "checkbox",
           "caption": "Th"
         },
         {
           "name": "fri",
-          "value": ${settings.fri},
+          "value": fri,
           "type": "checkbox",
           "caption": "Fr"
         },
         {
           "name": "sat",
-          "value": ${settings.sat},
+          "value": sat,
           "type": "checkbox",
           "caption": "Sa"
         }
