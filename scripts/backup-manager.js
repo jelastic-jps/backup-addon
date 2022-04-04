@@ -24,7 +24,9 @@ function BackupManager(config) {
         Random = com.hivext.api.utils.Random,
         SimpleDateFormat = java.text.SimpleDateFormat,
         StrSubstitutor = org.apache.commons.lang3.text.StrSubstitutor,
-        Scripting = com.hivext.api.development.Scripting,
+	Scripting = com.hivext.api.development.Scripting,
+        LoggerFactory = org.slf4j.LoggerFactory,
+        Logger = LoggerFactory.getLogger("scripting.logger.backup-addon"),
 
         me = this,
         nodeManager,
@@ -85,22 +87,22 @@ function BackupManager(config) {
                 'BACKUP_ADDON_REPO=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $1"/"$2}\')',
                 'BACKUP_ADDON_BRANCH=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $3}\')',
                 'BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk \'{print $1}\')',
-                'echo $(date) "Creating the %(backupType) backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID})" | tee -a %(backupLogFile)',
+                'echo $(date) %(envName) "Creating the %(backupType) backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID}) on storage node %(nodeId)" | tee -a %(backupLogFile)',
                 '[ -d /opt/backup ] || mkdir -p /opt/backup',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup snapshots || RESTIC_PASSWORD=%(envName) restic init -r /opt/backup',
-                'echo "Checking the backup repository integrity and consistency before adding the new snapshot" | tee -a %(backupLogFile)',
+                'echo $(date) %(envName) "Checking the backup repository integrity and consistency before adding the new snapshot" | tee -a %(backupLogFile)',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check | tee -a %(backupLogFile)',
                 'DUMP_NAME=$(date "+%F_%H%M%S")',
                 'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
                 'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
-                'echo "Creating the DB dump" | tee -a %(backupLogFile)',
+                'echo $(date) %(envName) "Creating the DB dump" | tee -a %(backupLogFile)',
                 'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
-                'echo "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a %(backupLogFile)',
+                'echo $(date) %(envName) "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a %(backupLogFile)',
                 'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status || service mysql start; fi',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} %(backupType)" %(appPath) ~/wp_db_backup.sql | tee -a %(backupLogFile)',
-                'echo "Rotating snapshots by keeping the last %(backupCount)" | tee -a %(backupLogFile)',    
+                'echo $(date) %(envName) "Rotating snapshots by keeping the last %(backupCount)" | tee -a %(backupLogFile)',    
                 'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune | tee -a %(backupLogFile)',
-                'echo "Checking the backup repository integrity and consistency after adding the new snapshot and rotating old ones" | tee -a %(backupLogFile)',
+                'echo $(date) %(envName) "Checking the backup repository integrity and consistency after adding the new snapshot and rotating old ones" | tee -a %(backupLogFile)',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check --read-data-subset=1/10 | tee -a %(backupLogFile)'
             ], {
                 nodeId : config.backupExecNode,
@@ -576,6 +578,7 @@ function BackupManager(config) {
     }
 
     function log(message) {
+        Logger.debug(message);
         return jelastic.marketplace.console.WriteLog(appid, session, message);
     }
 
