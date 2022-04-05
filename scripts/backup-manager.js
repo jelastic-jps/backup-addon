@@ -60,7 +60,7 @@ function BackupManager(config) {
 
         return me.exec([
 	    [ me.cmd, [
-                'echo $(date) %(envName) "Creating the backup task for %(envName) which the backup count %(backupCount), backup schedule %(cronTime) and backup storage env %(storageEnv)" | tee -a %(backupLogFile)'
+                'echo $(date) %(envName) "Creating the backup task for %(envName) with the backup count %(backupCount), backup schedule %(cronTime) and backup storage env %(storageEnv)" | tee -a %(backupLogFile)'
             ], {
                 nodeId : config.backupExecNode,
                 envName : config.envName,
