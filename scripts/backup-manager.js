@@ -26,7 +26,8 @@ function BackupManager(config) {
         StrSubstitutor = org.apache.commons.lang3.text.StrSubstitutor,
 	Scripting = com.hivext.api.development.Scripting,
         LoggerFactory = org.slf4j.LoggerFactory,
-        Logger = LoggerFactory.getLogger("scripting.logger.backup-addon"),
+        LoggerName = "scripting.logger.backup-addon:" + config.envName,
+        Logger = LoggerFactory.getLogger(LoggerName),
 
         me = this,
         nodeManager,
