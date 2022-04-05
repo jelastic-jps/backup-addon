@@ -59,6 +59,16 @@ function BackupManager(config) {
         var resp;
 
         return me.exec([
+	    [ me.cmd, [
+                'echo $(date) %(envName) "Creating the backup task for %(envName) which the backup count %(backupCount), backup schedule %(cronTime) and backup storage env %(storageEnv)" | tee -a %(backupLogFile)'
+            ], {
+                nodeId : config.backupExecNode,
+                envName : config.envName,
+                cronTime : config.cronTime,
+                storageEnv : config.storageEnv,
+                backupCount : config.backupCount,
+                backupLogFile : "/var/log/backup_addon.log"
+            }],
             [ me.createScript   ],
             [ me.clearScheduledBackups ],
             [ me.scheduleBackup ]
