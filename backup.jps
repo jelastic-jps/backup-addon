@@ -90,7 +90,8 @@ settings:
               caption: "Time Zone"
               type: "list"
               required: true
-              editable: false
+              editable: true
+              forceSelection: true
               values: values
           3:
             - name: cronTime
