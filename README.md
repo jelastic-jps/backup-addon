@@ -25,7 +25,7 @@ On the backup storage node, the Restic is used to serve requests from Applicatio
 
 ## Installation Process  
 
-1. [Import](https://docs.jelastic.com/environment-import/) the [link of the manifest](https://raw.githubusercontent.com/jelastic-jps/backup-addon/main/backup.jps) within a dashboard of [Virtuozzo Application Platform for WordPress](https://docs.test-site.jelastic.com/virtuozzo-application-platform-for-wordpress/) 
+1. [Import](https://docs.jelastic.com/environment-import/) the [link of the manifest](https://raw.githubusercontent.com/jelastic-jps/backup-addon/main/backup.jps) within a dashboard of [Virtuozzo Application Platform for WordPress](https://docs.jelastic.com/virtuozzo-application-platform-for-wordpress/) 
 
 <p align="left"> 
 <img src="images/import.png" width="400">
