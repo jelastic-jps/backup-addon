@@ -107,7 +107,7 @@ function BackupManager(config) {
                 'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
                 'source /.jelenv ; [[ "${MARIADB_VERSION%.*}" == "10.3" ]] && COL_STAT="" || COL_STAT="--column-statistics=0"',
                 'echo $(date) %(envName) "Creating the DB dump" | tee -a %(backupLogFile)',
-		'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status || service mysql start; fi',
+		'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi',
                 'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
                 'echo $(date) %(envName) "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a %(backupLogFile)',
                 'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} %(backupType)" %(appPath) ~/wp_db_backup.sql | tee -a %(backupLogFile)',
@@ -146,7 +146,7 @@ function BackupManager(config) {
             }],
             [ me.cmd, [
 		'echo $(date) %(envName) Restoring the database from snapshot $(cat /root/.backupid)',
-                '! which mysqld || service mysql start',
+                '! which mysqld || service mysql start 2>&1',
                 'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
                 'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi',
                 'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"',
