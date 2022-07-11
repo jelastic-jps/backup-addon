@@ -30,8 +30,9 @@ for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
     }
 }
 
+jps.settings.main.fields[1].values = envs;
+jps.settings.main.fields[1].default = "";
 if (envs.length > 0) {
-    jps.settings.main.fields[1].values = envs;
     if (currentStorageExists == true) {
         jps.settings.main.fields[1].default = '${settings.storageName}';
     } else {

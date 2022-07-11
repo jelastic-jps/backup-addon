@@ -1,10 +1,10 @@
 type: update
-jpsVersion: 7.1.1
-name: Backup/Restore for the filesystem and the databases
+jpsVersion: 6.1.1
+name: WordPress Backup/Restore for the filesystem and the databases
 id: wp-backup
 targetEditions: any
 logo: /images/backup-logo.svg
-description: Backup Add-On for the filesystem and the databases. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
+description: Backup Add-On for the WordPress application root directory and the database. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
 baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
 
 targetNodes:
@@ -151,6 +151,7 @@ globals:
   scriptSufix: wp-backup
 
 onInstall:
+  - checkApplication
   - installRestic
   - setSchedule
 
@@ -164,8 +165,41 @@ onBeforeDelete:
   
 onAfterRedeployContainer[cp]:
   - installRestic
+  
+onAfterClone:     
+  - script: return {result:0, jps:MANIFEST};
+  - install: ${response.jps}
+    nodeGroup: ${targetNodes.nodeGroup:cp}
+    envName: ${event.response.env.envName}
+    settings:
+      scheduleType: ${settings.scheduleType}
+      storageName: ${settings.storageName}
+      cronTime: ${settings.cronTime}
+      backupTime: ${settings.backupTime}
+      sun: ${settings.sun} 
+      mon: ${settings.mon}
+      tue: ${settings.tue}
+      wed: ${settings.wed}
+      thu: ${settings.thu}
+      fri: ${settings.fri}
+      sat: ${settings.sat}
+      tz: ${settings.tz}    
+      backupCount: ${settings.backupCount}
+
+onAfterConfirmTransfer: setSchedule
 
 actions:
+  checkApplication:
+    - cmd[${nodes.cp.master.id}]: |-
+        [ -f /root/check_app.sh ] && rm -f /root/check_app.sh;
+        wget -O /root/check_app.sh ${baseUrl}/scripts/check_app.sh;
+        bash /root/check_app.sh;
+      user: root
+    - if (response.out == "Non-supported"):
+      - stopEvent:
+          type: warning
+          message: Deployed application is not supported by Backup add-on.
+    
   installRestic:
     cmd [cp]: |-
       yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/copart/restic/repo/epel-7/copart-restic-epel-7.repo

@@ -78,6 +78,25 @@ function BackupManager(config) {
     me.uninstall = function () {
         return me.exec(me.clearScheduledBackups);
     };
+	
+    me.checkCurrentlyRunningBackup = function () {
+	var resp = me.exec([
+            [ me.cmd, [
+                'pgrep -f "%(envName)"_backup-logic.sh 1>/dev/null && echo "Running"; true'
+            ], {
+                nodeId : config.backupExecNode,
+                envName : config.envName
+            }]
+        ]);
+	if (resp.responses[0].out == "Running") {
+	    return {
+                result : Response.ERROR_UNKNOWN,
+                error : "Another backup process is already running"
+            }
+	} else {
+	    return { "result": 0};
+	}
+    }
 
     me.backup = function () {
         var backupType,
@@ -92,29 +111,13 @@ function BackupManager(config) {
         return me.exec([
             [ me.checkEnvStatus ],
             [ me.checkStorageEnvStatus ],
+	    [ me.checkCurrentlyRunningBackup ],
             [ me.removeMounts ],
             [ me.addMountForBackupRestore ],
             [ me.cmd, [
-                'BACKUP_ADDON_REPO=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $1"/"$2}\')',
-                'BACKUP_ADDON_BRANCH=$(echo %(baseUrl)|sed \'s|https:\/\/raw.githubusercontent.com\/||\'|awk -F / \'{print $3}\')',
-                'BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk \'{print $1}\')',
-                'echo $(date) %(envName) "Creating the %(backupType) backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID}) on storage node %(nodeId)" | tee -a %(backupLogFile)',
-                '[ -d /opt/backup ] || mkdir -p /opt/backup',
-                'RESTIC_PASSWORD=%(envName) restic -r /opt/backup snapshots || RESTIC_PASSWORD=%(envName) restic init -r /opt/backup',
-                'echo $(date) %(envName) "Checking the backup repository integrity and consistency before adding the new snapshot" | tee -a %(backupLogFile)',
-                'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check | tee -a %(backupLogFile)',
-                'DUMP_NAME=$(date "+%F_%H%M%S")',
-                'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php |grep ${i}|awk \'{print $3}\'|tr -d "\'"); done',
-		'source /.jelenv ; if [[ ${MARIADB_VERSION//.*} -eq 10 && ${MARIADB_VERSION:3:1} -le 4 ]]; then COL_STAT=""; else COL_STAT="--column-statistics=0"; fi',
-                'echo $(date) %(envName) "Creating the DB dump" | tee -a %(backupLogFile)',
-		'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi',
-                'mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql',
-                'echo $(date) %(envName) "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a %(backupLogFile)',
-                'RESTIC_PASSWORD=%(envName) restic -r /opt/backup backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} %(backupType)" %(appPath) ~/wp_db_backup.sql | tee -a %(backupLogFile)',
-                'echo $(date) %(envName) "Rotating snapshots by keeping the last %(backupCount)" | tee -a %(backupLogFile)',    
-                'RESTIC_PASSWORD=%(envName) restic forget -r /opt/backup --keep-last %(backupCount) --prune | tee -a %(backupLogFile)',
-                'echo $(date) %(envName) "Checking the backup repository integrity and consistency after adding the new snapshot and rotating old ones" | tee -a %(backupLogFile)',
-                'RESTIC_PASSWORD=%(envName) restic -r /opt/backup check --read-data-subset=1/10 | tee -a %(backupLogFile)'
+		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
+                'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh',
+                'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
             ], {
                 nodeId : config.backupExecNode,
                 envName : config.envName,
@@ -132,6 +135,7 @@ function BackupManager(config) {
         return me.exec([
             [ me.checkEnvStatus ],
             [ me.checkStorageEnvStatus ],
+	    [ me.checkCurrentlyRunningBackup ],
             [ me.removeMounts ],
             [ me.addMountForBackupRestore ],
             [ me.cmd, [
@@ -204,17 +208,23 @@ function BackupManager(config) {
 
         return { result : 0 };
     };
-    
+	
     me.checkStorageEnvStatus = function checkStorageEnvStatus() {
         if(typeof config.storageEnv !== 'undefined'){
-            if (!nodeManager.isStorageEnvRunning()) {
+            var resp = jelastic.env.control.GetEnvInfo(config.storageEnv, session);
+            if (resp.result === 11){
+                return {
+                    result : EnvironmentResponse.ENVIRONMENT_NOT_EXIST,
+                    error : _("Storage env [%(name)] is deleted", {name : config.storageEnv})
+                };
+            } else if (resp.env.status === 2) {
                 return {
                     result : EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
                     error : _("Storage env [%(name)] not running", {name : config.storageEnv})
                 };
             }
             return { result : 0 };
-        }
+        };
         return { result : 0 };
     };
 
@@ -354,16 +364,6 @@ function BackupManager(config) {
                 throw new Error("can't get environment info: " + toJSON(resp));
             }
 
-            return resp.env.status == ENV_STATUS_TYPE_RUNNING;
-        };
-        
-        me.isStorageEnvRunning = function () {
-            var resp = me.getStorageEnvInfo();
-            if (resp.result === 11){
-                throw new Error("Storage environment " + config.storageEnv + " is deleted");
-            } else if (resp.result != 0) {
-                throw new Error("can't get environment info: " + toJSON(resp));
-            }
             return resp.env.status == ENV_STATUS_TYPE_RUNNING;
         };
 
