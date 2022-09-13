@@ -8,6 +8,7 @@ ENV_NAME=$6
 BACKUP_COUNT=$7
 APP_PATH=$8
 
+
 function backup(){
     echo $$ > /var/run/${ENV_NAME}_backup.pid
     BACKUP_ADDON_REPO=$(echo ${BASE_URL}|sed 's|https:\/\/raw.githubusercontent.com\/||'|awk -F / '{print $1"/"$2}')
