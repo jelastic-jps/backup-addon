@@ -8,7 +8,11 @@ description: Backup Add-On for the WordPress application root directory and the 
 baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
 
 targetNodes:
-  nodeGroup: cp
+  nodeType:
+    - nginxphp
+    - litespeedphp
+    - lemp
+    - llsmp
 
 settings:
   main:
