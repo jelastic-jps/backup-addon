@@ -119,7 +119,7 @@ settings:
         caption: Number of backups
         tooltip: "The number of newest backups to be kept during rotation."  
         min: 1
-        max: 30
+        max: 100
         default: 5
     onBeforeInit: scripts/configOnBeforeInit.js
         
