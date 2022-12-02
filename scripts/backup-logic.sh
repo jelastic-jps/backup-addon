@@ -23,7 +23,7 @@ function backup(){
         RESTIC_PASSWORD=${ENV_NAME} restic init -r /opt/backup
     fi
     DUMP_NAME=$(date "+%F_%H%M%S")
-    for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat ${APP_PATH}/wp-config.php |grep ${i}|grep -v '^[[:space:]]*#'|awk '{print $3}'|tr -d "'"); done
+    for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat ${APP_PATH}/wp-config.php|grep ${i}|grep -v '^[[:space:]]*#'|tr -d ' '|awk -F ',' '{print $2}'|tr -d "');"|tail -n 1); done
     source /.jelenv ; if [[ ${MARIADB_VERSION//.*} -eq 10 && ${MARIADB_VERSION:3:1} -le 4 ]]; then COL_STAT=""; else COL_STAT="--column-statistics=0"; fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
