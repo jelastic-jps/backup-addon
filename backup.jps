@@ -245,7 +245,6 @@ actions:
     - callScript: backup
     
   restore:
-    - getStorageCtid
     - cmd[cp]: |-
         echo "${settings.backupDir}" > /root/.backupid
       user: root
