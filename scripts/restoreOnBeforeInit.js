@@ -8,7 +8,7 @@ var backupedEnvDomain = '${env.envName}';
 resp = jelastic.env.control.GetEnvInfo(storageEnvDomain, session);
 if (resp.result != 0 && resp.result != 11) return resp;
 if (resp.result == 11) {
-    storage_unavailable_markup = "Storage environment" + "${settings.storageName}" + "is deleted.";
+    storage_unavailable_markup = "Storage environment " + "${settings.storageName}" + " is deleted.";
 } else if (resp.env.status == 1) {
     var backups = jelastic.env.control.ExecCmdById(storageEnvDomain, session, storageEnvMasterId, toJSON([{"command": "/root/getBackups.sh", "params": backupedEnvDomain}]), false, "root").responses[0].out;
     var backupList = toNative(new JSONObject(String(backups))).backups;
