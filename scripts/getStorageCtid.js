@@ -1,4 +1,4 @@
-var storageEnv = '${globals.storageEnv}'
+var storageEnv = '${settings.storageName}'
 var storageEnvShortName = storageEnv.split(".")[0]
 var resp = jelastic.environment.control.GetEnvInfo(storageEnvShortName, session)
 if (resp.result != 0) return resp
