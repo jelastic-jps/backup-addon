@@ -125,7 +125,7 @@ settings:
         
   restore:
     fields: []
-    onBeforeInit: scripts/restoreOnBeforeInit.js
+    onBeforeInit: scripts/multipleRestoreOnBeforeInit.js
       
 onBeforeInit: scripts/backupOnBeforeInit.js
 
