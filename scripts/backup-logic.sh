@@ -27,7 +27,7 @@ function backup(){
     source /.jelenv ; if [[ ${MARIADB_VERSION//.*} -eq 10 && ${MARIADB_VERSION:3:1} -le 6 ]]; then COL_STAT=""; else COL_STAT="--column-statistics=0"; fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
-    mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases --compress ${COL_STAT} > wp_db_backup.sql || { echo "DB backup process failed."; exit 1; }
+    mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo "DB backup process failed."; exit 1; }
     echo $(date) ${ENV_NAME} "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a ${BACKUP_LOG_FILE}
     { RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup rotation failed."; exit 1; }
     echo $(date) ${ENV_NAME} "Rotating snapshots by keeping the last ${BACKUP_COUNT}" | tee -a $BACKUP_LOG_FILE
