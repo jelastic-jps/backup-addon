@@ -111,7 +111,7 @@ function BackupManager(config) {
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
             [me.removeMounts],
-            [me.addMountForBackupRestore],
+            [me.addMountForBackup],
             [me.cmd, ['[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true', 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh', 'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'],
             {
                 nodeId: config.backupExecNode,
@@ -132,7 +132,7 @@ function BackupManager(config) {
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
             [me.removeMounts],
-            [me.addMountForBackupRestore],
+            [me.addMountForRestore],
             [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
             {
                 nodeGroup: "cp",
@@ -160,7 +160,23 @@ function BackupManager(config) {
         ]);
     }
 
-    me.addMountForBackupRestore = function addMountForBackupRestore() {
+    me.addMountForBackup = function addMountForBackup() {
+        var delay = (Math.floor(Math.random() * 50) * 1000);
+	    java.lang.Thread.sleep(delay);
+        var resp = jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
+        if (resp.result != 0) {
+            var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+            try {
+                jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+            } catch (ex) {
+                emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+            }
+        }
+        return resp;
+    }
+
+    me.addMountForRestore = function addMountForRestore() {
         var resp = jelastic.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
         if (resp.result != 0) {
             var title = "Backup storage " + config.storageEnv + " is unreacheable",
@@ -178,7 +194,19 @@ function BackupManager(config) {
         var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
         for (var i = 0, n = allMounts.length; i < n; i++) {
             if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                return jelastic.env.file.RemoveMountPointByGroup(config.envName, session, "cp", "/opt/backup");
+                var resp = jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+                if (resp.result != 0) {
+                    return resp;
+                }
+            }
+        }
+        allMounts = jelastic.env.file.GetMountPoints(config.envName, session).array;
+        for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
+                resp = jelastic.env.file.RemoveMountPointByGroup(config.envName, session, "cp", "/opt/backup");
+                if (resp.result != 0) {
+                    return resp;
+                }
             }
         }
         return {
