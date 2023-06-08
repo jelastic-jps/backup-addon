@@ -27,7 +27,7 @@ function backup(){
     DB_HOST=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $1}');
     DB_PORT=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $2}');
     if [ -n "${DB_PORT}" ]; then 
-        MYSQLDUMP_DB_PORT_OPTION="-p ${DB_PORT}"
+        MYSQLDUMP_DB_PORT_OPTION="-P ${DB_PORT}"
     else
         MYSQLDUMP_DB_PORT_OPTION=""
     fi
