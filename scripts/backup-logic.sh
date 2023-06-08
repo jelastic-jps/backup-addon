@@ -26,11 +26,15 @@ function backup(){
     for i in DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php|grep ${i}|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1); done
     DB_HOST=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $1}');
     DB_PORT=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $2}');
-    [ -z "${DB_PORT}" ] && DB_PORT="3306"
+    if [ -n "${DB_PORT}" ]; then 
+        MYSQLDUMP_DB_PORT_OPTION="-p ${DB_PORT}"
+    else
+        MYSQLDUMP_DB_PORT_OPTION=""
+    fi
     source /.jelenv ; if [[ ${MARIADB_VERSION//.*} -eq 10 && ${MARIADB_VERSION:3:1} -le 6 ]]; then COL_STAT=""; else COL_STAT="--column-statistics=0"; fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
-    mysqldump -h ${DB_HOST} -u ${DB_USER} -P ${DB_PORT} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo "DB backup process failed."; exit 1; }
+    mysqldump -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo "DB backup process failed."; exit 1; }
     echo $(date) ${ENV_NAME} "Saving data and DB dump to ${DUMP_NAME} snapshot" | tee -a ${BACKUP_LOG_FILE}
     { RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup rotation failed."; exit 1; }
     echo $(date) ${ENV_NAME} "Rotating snapshots by keeping the last ${BACKUP_COUNT}" | tee -a $BACKUP_LOG_FILE
