@@ -32,6 +32,9 @@ function backup(){
         MYSQLDUMP_DB_PORT_OPTION=""
     fi
     SERVER_VERSION_STRING=$(mysql -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
+    WP_DB_STACK_NAME=$(echo $SERVER_VERSION_STRING|awk '{print $4}')
+    WP_DB_STACK_NAME=${WP_DB_STACK_NAME^^}
+    WP_DB_STACK_VERSION=$(echo ${SERVER_VERSION_STRING}|awk '{print $3}'|awk -F '-' '{print $1}')
     source /.jelenv ; if [[ ${MARIADB_VERSION//.*} -eq 10 && ${MARIADB_VERSION:3:1} -le 6 ]]; then COL_STAT=""; else COL_STAT="--column-statistics=0"; fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
