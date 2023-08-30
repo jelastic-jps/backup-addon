@@ -156,6 +156,7 @@ globals:
 
 onInstall:
   - checkApplication
+  - checkAddons
   - installRestic
   - setSchedule
 
@@ -203,7 +204,32 @@ actions:
       - stopEvent:
           type: warning
           message: Deployed application is not supported by Backup add-on.
-    
+
+  checkAddons:
+    - script: |-
+        var onAfterReturn = { setGlobals: {} },
+          glbs = onAfterReturn.setGlobals,
+          resp = api.marketplace.app.GetAddonList({
+            search: {},
+            envName: "${env.name}",
+            session: session
+          });
+        if (resp.result != 0) return resp;
+        glbs["alreadyInstalled"] = false;
+        for (let i = 0, n = resp.apps.length; i < n; i++) {
+        if (resp.apps[i].isInstalled) {
+            if (resp.apps[i].app_id == 'db-backup') {
+              glbs["alreadyInstalled"] = true;
+              break;
+            } 
+          }
+        }
+        return { result: 0, onAfterReturn: onAfterReturn };
+    - if ('${globals.alreadyInstalled}' == 'true' ):
+      - stopEvent:
+          type: warning
+          message: Database backup add-on is already installed on ${env.name}. Backup addon installation is not possible.
+
   installRestic:
     cmd [cp]: |-
       if which dnf; then
