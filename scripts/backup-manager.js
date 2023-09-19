@@ -249,10 +249,10 @@ function BackupManager(config) {
         }
 	var cpNodes = resp.nodes;
         for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
-            var allMounts = api.env.file.GetMountPoints('env-wpkk', session, cpNodes[currentNode].id).array;
+            var allMounts = api.env.file.GetMountPoints(config.envName, session, cpNodes[currentNode].id).array;
             for (var i = 0, n = allMounts.length; i < n; i++) {
                 if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                    resp = api.env.file.RemoveMountPointById('env-wpkk', session, cpNodes[currentNode].id, "/opt/backup");
+                    resp = api.env.file.RemoveMountPointById(config.envName, session, cpNodes[currentNode].id, "/opt/backup");
                     if (resp.result != 0) {
                         return resp;
                     }
