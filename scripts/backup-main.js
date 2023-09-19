@@ -18,7 +18,7 @@ function run() {
         storageEnv        : "${storageEnv}"
     });
 
-    jelastic.local.ReturnResult(
+    api.local.ReturnResult(
         BackupManager.invoke(action)
     );
 }
@@ -39,6 +39,6 @@ try {
         error: "Error: " + toJSON(ex)
     };
 
-    jelastic.marketplace.console.WriteLog(appid, signature, "ERROR: " + resp);
-    jelastic.local.ReturnResult(resp);
+    api.marketplace.console.WriteLog(appid, signature, "ERROR: " + resp);
+    api.local.ReturnResult(resp);
 }

@@ -97,6 +97,17 @@ function BackupManager(config) {
         }
     }
 
+    me.getStorageNodeId = function () {
+        let storageEnv = config.storageEnv
+        let resp = api.environment.control.GetEnvInfo({ envName: storageEnv.split(".")[0] })
+        if (resp.result != 0) return resp
+    
+        let storageNode = resp.nodes.filter(node => (node.nodeGroup == 'storage' && node.ismaster))[0];
+        if (!storageNode) return { result: Response.OBJECT_NOT_EXIST, error: "storage node not found" };
+    
+        return { result: 0, storageCtid : storageNode.id };
+    }
+
     me.backup = function () {
         var backupType, isManual = !getParam("task");
 
@@ -106,23 +117,46 @@ function BackupManager(config) {
             backupType = "auto";
         }
 
+	var backupCallParams = {
+                nodeId : config.backupExecNode,
+                envName : config.envName,
+                appPath: "/var/www/webroot/ROOT",
+                backupCount : config.backupCount,
+                backupLogFile : "/var/log/backup_addon.log",
+                baseUrl : config.baseUrl,
+                backupType : backupType
+        }
+
         return me.exec([
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMounts],
+            [me.removeMount],
             [me.addMountForBackup],
-            [me.cmd, ['[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true', 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh', 'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'],
-            {
-                nodeId: config.backupExecNode,
-                envName: config.envName,
-                appPath: "/var/www/webroot/ROOT",
-                backupCount: config.backupCount,
-                backupLogFile: "/var/log/backup_addon.log",
-                baseUrl: config.baseUrl,
-                backupType: backupType
-            }],
-            [me.removeMounts]
+            [me.cmd, [
+		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
+                'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
+            ], {
+		nodeId : config.backupExecNode,
+                envName : config.envName,
+		baseUrl : config.baseUrl
+	        }],
+            [me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+            ], backupCallParams ],
+	    [me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+            ], backupCallParams ],
+	    [me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh create_snapshot %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+            ], backupCallParams ],
+            [me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh rotate_snapshots %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+            ], backupCallParams ],
+            [me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+            ], backupCallParams ],
+            [me.removeMount]
         ]);
     };
 
@@ -131,7 +165,7 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMounts],
+            [me.removeMount],
             [me.addMountForRestore],
             [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
             {
@@ -141,12 +175,9 @@ function BackupManager(config) {
             [me.cmd, [
                 'echo $(date) %(envName) Restoring the database from snapshot $(cat /root/.backupid)', 
                 '! which mysqld || service mysql start 2>&1', 
-                'for i in DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php | grep ${i} |grep -v \'^[[:space:]]*#\' | tr -d \'[[:blank:]]\' | awk -F \',\' \'{print $2}\' | tr -d "\\"\');"|tr -d \'\\r\'|tail -n 1); done',
-                'DB_HOST=$(cat %(appPath)/wp-config.php | grep DB_HOST |grep -v \'^[[:space:]]*#\' | tr -d \'[[:blank:]]\' | awk -F \',\' \'{print $2}\' | tr -d "\\"\');"|tr -d \'\\r\'|tail -n 1|awk -F \':\' \'{print $1}\')',
-		'DB_PORT=$(cat %(appPath)/wp-config.php | grep DB_PORT |grep -v \'^[[:space:]]*#\' | tr -d \'[[:blank:]]\' | awk -F \',\' \'{print $2}\' | tr -d "\\"\');"|tr -d \'\\r\'|tail -n 1|awk -F \':\' \'{print $2}\')',
-		'if [ -n "${DB_PORT}" ]; then MYSQLDUMP_DB_PORT_OPTION="-P ${DB_PORT}"; else MYSQLDUMP_DB_PORT_OPTION=""; fi',    
+                'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php | grep ${i} |grep -v \'^[[:space:]]*#\' | tr -d \'[[:blank:]]\' | awk -F \',\' \'{print $2}\' | tr -d "\\"\');"|tr -d \'\\r\'|tail -n 1); done', 
                 'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi', 
-                'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} ${MYSQLDUMP_DB_PORT_OPTION} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"', 'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
+                'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"', 'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
             ],
             {
                 nodeId: config.backupExecNode,
@@ -159,59 +190,73 @@ function BackupManager(config) {
                 nodeGroup: "cp",
                 envName: config.envName
             }],
-            [me.removeMounts]
+            [me.removeMount]
         ]);
     }
 
     me.addMountForBackup = function addMountForBackup() {
+	var resp = me.getStorageNodeId();
+	if (resp.result != 0) {
+            throw new Error("can't get backup storage node id: " + toJSON(resp));
+        }
+	var currentStorageNodeId = resp.storageCtid;
         var delay = (Math.floor(Math.random() * 50) * 1000);
 	    java.lang.Thread.sleep(delay);
-        var resp = jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
+        resp = api.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', currentStorageNodeId, 'WPBackupRestore', false);
         if (resp.result != 0) {
-            var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-            try {
-                jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-            } catch (ex) {
-                emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-            }
+	    if (resp.result != 2031) {
+                var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+                try {
+                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                } catch (ex) {
+                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+                }
+	    }
         }
-        return resp;
+	return {
+            "result": 0
+        };
     }
 
     me.addMountForRestore = function addMountForRestore() {
-        var resp = jelastic.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
+	var resp = me.getStorageNodeId();
+	if (resp.result != 0) {
+            throw new Error("can't get backup storage node id: " + toJSON(resp));
+        }
+	var currentStorageNodeId = resp.storageCtid;
+        resp = api.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
         if (resp.result != 0) {
-            var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-            try {
-                jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-            } catch (ex) {
-                emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-            }
+	    if (resp.result != 2031) {
+                var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+                try {
+                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                } catch (ex) {
+                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+                }
+	    }
         }
         return resp;
     }
 
-    me.removeMounts = function removeMountForBackup() {
-        var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
-        for (var i = 0, n = allMounts.length; i < n; i++) {
-            if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                var resp = jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
-                if (resp.result != 0) {
-                    return resp;
+    me.removeMount = function removeMount() {
+        resp = api.env.control.GetEnvInfo(config.envName, session);
+        if (resp.result != 0) {
+            return resp;
+        }
+	var cpNodes = resp.nodes;
+        for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
+            var allMounts = api.env.file.GetMountPoints('env-wpkk', session, cpNodes[currentNode].id).array;
+            for (var i = 0, n = allMounts.length; i < n; i++) {
+                if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
+                    resp = api.env.file.RemoveMountPointById('env-wpkk', session, cpNodes[currentNode].id, "/opt/backup");
+                    if (resp.result != 0) {
+                        return resp;
+                    }
                 }
             }
-        }
-        allMounts = jelastic.env.file.GetMountPoints(config.envName, session).array;
-        for (var i = 0, n = allMounts.length; i < n; i++) {
-            if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                resp = jelastic.env.file.RemoveMountPointByGroup(config.envName, session, "cp", "/opt/backup");
-                if (resp.result != 0) {
-                    return resp;
-                }
-            }
-        }
+        }   
         return {
             "result": 0
         };
@@ -234,7 +279,7 @@ function BackupManager(config) {
 
     me.checkStorageEnvStatus = function checkStorageEnvStatus() {
         if (typeof config.storageEnv !== 'undefined') {
-            var resp = jelastic.env.control.GetEnvInfo(config.storageEnv, session);
+            var resp = api.env.control.GetEnvInfo(config.storageEnv, session);
             if (resp.result === 11) {
                 return {
                     result: EnvironmentResponse.ENVIRONMENT_NOT_EXIST,
@@ -270,15 +315,15 @@ function BackupManager(config) {
             scriptBody = me.replaceText(scriptBody, config);
 
             //delete the script if it already exists
-            jelastic.dev.scripting.DeleteScript(scriptName);
+            api.dev.scripting.DeleteScript(scriptName);
 
             //create a new script
-            resp = jelastic.dev.scripting.CreateScript(scriptName, "js", scriptBody);
+            resp = api.dev.scripting.CreateScript(scriptName, "js", scriptBody);
 
             java.lang.Thread.sleep(1000);
 
             //build script to avoid caching
-            jelastic.dev.scripting.Build(scriptName);
+            api.dev.scripting.Build(scriptName);
         } catch (ex) {
             resp = {
                 result: Response.ERROR_UNKNOWN,
@@ -294,7 +339,7 @@ function BackupManager(config) {
         var quartz = CronToQuartzConverter.convert(config.cronTime);
 
         for (var i = quartz.length; i--;) {
-            var resp = jelastic.utils.scheduler.CreateEnvTask({
+            var resp = api.utils.scheduler.CreateEnvTask({
                 appid: appid,
                 envName: config.envName,
                 session: session,
@@ -316,7 +361,7 @@ function BackupManager(config) {
 
     me.clearScheduledBackups = function clearScheduledBackups() {
         var envAppid = config.envAppid,
-            resp = jelastic.utils.scheduler.GetTasks(envAppid, session);
+            resp = api.utils.scheduler.GetTasks(envAppid, session);
 
         if (resp.result != 0) return resp;
 
@@ -324,7 +369,7 @@ function BackupManager(config) {
 
         for (var i = tasks.length; i--;) {
             if (tasks[i].script == config.scriptName) {
-                resp = jelastic.utils.scheduler.RemoveTask(envAppid, session, tasks[i].id);
+                resp = api.utils.scheduler.RemoveTask(envAppid, session, tasks[i].id);
 
                 if (resp.result != 0) return resp;
             }
@@ -415,7 +460,7 @@ function BackupManager(config) {
             var resp;
 
             if (!envInfo) {
-                resp = jelastic.env.control.GetEnvInfo(envName, session);
+                resp = api.env.control.GetEnvInfo(envName, session);
                 if (resp.result != 0) return resp;
 
                 envInfo = resp;
@@ -427,7 +472,7 @@ function BackupManager(config) {
         me.getStorageEnvInfo = function () {
             var resp;
             if (!storageEnvInfo) {
-                resp = jelastic.env.control.GetEnvInfo(config.storageEnv, session);
+                resp = api.env.control.GetEnvInfo(config.storageEnv, session);
                 storageEnvInfo = resp;
             }
             return storageEnvInfo;
@@ -447,11 +492,11 @@ function BackupManager(config) {
             }
 
             if (values.nodeGroup) {
-                resp = jelastic.env.control.ExecCmdByGroup(envName, session, values.nodeGroup, toJSON([{
+                resp = api.env.control.ExecCmdByGroup(envName, session, values.nodeGroup, toJSON([{
                     command: command
                 }]), true, false, "root");
             } else {
-                resp = jelastic.env.control.ExecCmdById(envName, session, values.nodeId, toJSON([{
+                resp = api.env.control.ExecCmdById(envName, session, values.nodeId, toJSON([{
                     command: command
                 }]), true, "root");
             }
@@ -460,7 +505,7 @@ function BackupManager(config) {
                 var title = "Backup failed for " + config.envName,
                     text = "Backup failed for the environment " + config.envName + " of " + user.email + " with error message " + resp.responses[0].errOut;
                 try {
-                    jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
                 } catch (ex) {
                     emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
                 }
@@ -471,7 +516,7 @@ function BackupManager(config) {
 
     function log(message) {
         Logger.debug(message);
-        return jelastic.marketplace.console.WriteLog(appid, session, message);
+        return api.marketplace.console.WriteLog(appid, session, message);
     }
 
     function _(str, values) {

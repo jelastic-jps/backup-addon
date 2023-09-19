@@ -1,4 +1,5 @@
-var resp = jelastic.env.control.GetEnvs();
+var storage_unavailable_markup = "";
+var resp = api.env.control.GetEnvs();
 if (resp.result !== 0) return resp;
 var envs = [];
 var nodes = {};
@@ -38,6 +39,8 @@ if (envs.length > 0) {
     } else {
         jps.settings.main.fields[1].default = envs[0].value;
     }
+} else {
+    storage_unavailable_markup = "There are no available backup storages on current account."
 }
       
 import java.util.TimeZone;
@@ -125,5 +128,11 @@ if (scheduleType == '1') {
 }
 
 jps.settings.main.fields[2].default = '${settings.backupCount}';
+
+if (storage_unavailable_markup.length > 0) {
+    jps.settings.main.fields.push(
+        {"type": "displayfield", "cls": "warning", "height": 30, "hideLabel": true, "markup": storage_unavailable_markup}
+    )
+}
 
 return settings;

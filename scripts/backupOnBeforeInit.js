@@ -1,4 +1,4 @@
-var resp = jelastic.env.control.GetEnvs();
+var resp = api.env.control.GetEnvs();
 if (resp.result !== 0) return resp;
 var envs = [];
 var nodes = {};
