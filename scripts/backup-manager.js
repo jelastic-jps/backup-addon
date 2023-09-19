@@ -237,7 +237,9 @@ function BackupManager(config) {
                 }
 	    }
         }
-        return resp;
+        return {
+            "result": 0
+        };
     }
 
     me.removeMount = function removeMount() {
