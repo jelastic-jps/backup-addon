@@ -8,20 +8,53 @@ ENV_NAME=$6
 BACKUP_COUNT=$7
 APP_PATH=$8
 
+function sendEmailNotification(){
+    if [ -e "/usr/lib/jelastic/modules/api.module" ]; then
+        [ -e "/var/run/jem.pid" ] && return 0;
+        CURRENT_PLATFORM_MAJOR_VERSION=$(jem api apicall -s --connect-timeout 3 --max-time 15 [API_DOMAIN]/1.0/statistic/system/rest/getversion 2>/dev/null |jq .version|grep -o [0-9.]*|awk -F . '{print $1}')
+        if [ "${CURRENT_PLATFORM_MAJOR_VERSION}" -ge "7" ]; then
+            echo $(date) ${ENV_NAME} "Sending e-mail notification about removing the stale lock" | tee -a $BACKUP_LOG_FILE;
+            SUBJECT="Slate lock is removed on /opt/backup/${ENV_NAME} backup repo"
+            BODY="Please pay attention to /opt/backup/${ENV_NAME} backup repo because the stale lock left from previous operation is removed during the integrity check and backup rotation. Manual check of backup repo integrity and consistency is highly desired."
+            jem api apicall -s --connect-timeout 3 --max-time 15 [API_DOMAIN]/1.0/message/email/rest/send --data-urlencode "session=$USER_SESSION" --data-urlencode "to=$USER_EMAIL" --data-urlencode "subject=$SUBJECT" --data-urlencode "body=$BODY"
+            if [[ $? != 0 ]]; then
+                echo $(date) ${ENV_NAME} "Sending of e-mail notification failed" | tee -a $BACKUP_LOG_FILE;
+            else
+                echo $(date) ${ENV_NAME} "E-mail notification is sent successfully" | tee -a $BACKUP_LOG_FILE;
+            fi
+        elif [ -z "${CURRENT_PLATFORM_MAJOR_VERSION}" ]; then #this elif covers the case if the version is not received
+            echo $(date) ${ENV_NAME} "Error when checking the platform version" | tee -a $BACKUP_LOG_FILE;
+        else
+            echo $(date) ${ENV_NAME} "${EMAIL_ERROR_LOG_MESSAGE}" | tee -a $BACKUP_LOG_FILE;
+        fi
+    else
+        echo $(date) ${ENV_NAME} "${EMAIL_ERROR_LOG_MESSAGE}" | tee -a $BACKUP_LOG_FILE;
+    fi
+}
+
 function check_backup_repo(){
     [ -d /opt/backup/${ENV_NAME} ] || mkdir -p /opt/backup/${ENV_NAME}
     export FILES_COUNT=$(ls -n /opt/backup/${ENV_NAME}|awk '{print $2}');
     if [ "${FILES_COUNT}" != "0" ]; then 
         echo $(date) ${ENV_NAME}  "Checking the backup repository integrity and consistency" | tee -a $BACKUP_LOG_FILE;
+        if [[ $(ls -A /opt/backup/${ENV_NAME}/locks) ]] ; then
+	    echo $(date) ${ENV_NAME}  "Backup repository has a slate lock, removing" | tee -a $BACKUP_LOG_FILE;
+            GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -r /opt/backup/${ENV_NAME} unlock
+	    sendEmailNotification
+        fi
         GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} check --read-data-subset=1/10 || { echo "Backup repository integrity check failed."; exit 1; }
     else
-        echo $(date) ${ENV_NAME}  "Initializing the new backup repo" | tee -a $BACKUP_LOG_FILE;
         GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic init -r /opt/backup/${ENV_NAME}
     fi
 }
 
 function rotate_snapshots(){
     echo $(date) ${ENV_NAME} "Rotating snapshots by keeping the last ${BACKUP_COUNT}" | tee -a ${BACKUP_LOG_FILE}
+    if [[ $(ls -A /opt/backup/${ENV_NAME}/locks) ]] ; then
+        echo $(date) ${ENV_NAME}  "Backup repository has a slate lock, removing" | tee -a $BACKUP_LOG_FILE;
+        GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -r /opt/backup/${ENV_NAME} unlock
+	sendEmailNotification
+    fi
     { GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic forget -q -r /opt/backup/${ENV_NAME} --keep-last ${BACKUP_COUNT} --prune | tee -a $BACKUP_LOG_FILE; } || { echo "Backup rotation failed."; exit 1; }
 }
 
@@ -55,7 +88,7 @@ function backup(){
     fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
-    mysqldump -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo "DB backup process failed."; exit 1; }
+    mysqldump -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     rm -f /var/run/${ENV_NAME}_backup.pid
 }
 
