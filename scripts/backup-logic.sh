@@ -25,10 +25,10 @@ function sendEmailNotification(){
         elif [ -z "${CURRENT_PLATFORM_MAJOR_VERSION}" ]; then #this elif covers the case if the version is not received
             echo $(date) ${ENV_NAME} "Error when checking the platform version" | tee -a $BACKUP_LOG_FILE;
         else
-            echo $(date) ${ENV_NAME} "${EMAIL_ERROR_LOG_MESSAGE}" | tee -a $BACKUP_LOG_FILE;
+            echo $(date) ${ENV_NAME} "Email notification is not sent because this functionality is unavailable for current platform version." | tee -a $BACKUP_LOG_FILE;
         fi
     else
-        echo $(date) ${ENV_NAME} "${EMAIL_ERROR_LOG_MESSAGE}" | tee -a $BACKUP_LOG_FILE;
+        echo $(date) ${ENV_NAME} "Email notification is not sent because this functionality is unavailable for current platform version." | tee -a $BACKUP_LOG_FILE;
     fi
 }
 
