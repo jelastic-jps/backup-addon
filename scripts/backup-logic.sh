@@ -15,6 +15,7 @@ function check_backup_repo(){
         echo $(date) ${ENV_NAME}  "Checking the backup repository integrity and consistency" | tee -a $BACKUP_LOG_FILE;
         GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} check --read-data-subset=1/10 || { echo "Backup repository integrity check failed."; exit 1; }
     else
+        echo $(date) ${ENV_NAME}  "Initializing the new backup repo" | tee -a $BACKUP_LOG_FILE;
         GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic init -r /opt/backup/${ENV_NAME}
     fi
 }
@@ -25,6 +26,7 @@ function rotate_snapshots(){
 }
 
 function create_snapshot(){
+    echo $(date) ${ENV_NAME} "Uploading the snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
     DUMP_NAME=$(date "+%F_%H%M%S")
     { GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup snapshot creation failed."; exit 1; }
 }
