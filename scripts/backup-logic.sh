@@ -7,6 +7,8 @@ BACKUP_LOG_FILE=$5
 ENV_NAME=$6
 BACKUP_COUNT=$7
 APP_PATH=$8
+USER_SESSION=$9
+USER_EMAIL=${10}
 
 function sendEmailNotification(){
     if [ -e "/usr/lib/jelastic/modules/api.module" ]; then
@@ -59,9 +61,10 @@ function rotate_snapshots(){
 }
 
 function create_snapshot(){
-    echo $(date) ${ENV_NAME} "Uploading the snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
     DUMP_NAME=$(date "+%F_%H%M%S")
+    echo $(date) ${ENV_NAME} "Begin uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}  
     { GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup snapshot creation failed."; exit 1; }
+    echo $(date) ${ENV_NAME} "End uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
 }
 
 function backup(){
