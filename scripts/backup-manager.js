@@ -124,7 +124,9 @@ function BackupManager(config) {
                 backupCount : config.backupCount,
                 backupLogFile : "/var/log/backup_addon.log",
                 baseUrl : config.baseUrl,
-                backupType : backupType
+                backupType : backupType,
+		session : session,
+		email : user.email
         }
 
         return me.exec([
@@ -142,7 +144,7 @@ function BackupManager(config) {
 		baseUrl : config.baseUrl
 	        }],
             [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
 	    [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
@@ -151,10 +153,10 @@ function BackupManager(config) {
                 'bash /root/%(envName)_backup-logic.sh create_snapshot %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
             ], backupCallParams ],
             [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh rotate_snapshots %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+                'bash /root/%(envName)_backup-logic.sh rotate_snapshots %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
             [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
             [me.removeMount]
         ]);
