@@ -11,6 +11,8 @@ if (resp.result != 0 && resp.result != 11) return resp;
 if (resp.result == 11) {
     storage_unavailable_markup = "Storage environment " + "${settings.storageName}" + " is deleted.";
 } else if (resp.env.status == 1) {
+    var respUpdate = api.env.control.ExecCmdById(storageEnvDomain, session, storageEnvMasterId, toJSON([{"command": "/usr/bin/restic self-update 2>&1", "params": ""}]), false);
+    if (respUpdate.result != 0) return resp;
     var backups = api.env.control.ExecCmdById(storageEnvDomain, session, storageEnvMasterId, toJSON([{"command": "/root/getBackups.sh", "params": backupedEnvDomain}]), false).responses[0].out;
     var backupList = toNative(new JSONObject(String(backups))).backups;
     var backupListPrepared = prepareBackups(backupList);
