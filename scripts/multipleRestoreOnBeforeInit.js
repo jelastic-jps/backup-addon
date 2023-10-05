@@ -10,8 +10,11 @@ if (resp.result != 0 && resp.result != 11) return resp;
 if (resp.result == 11) {
        storage_unavailable_markup = "Storage environment " + "${settings.storageName}" + " is deleted.";
 } else if (resp.env.status == 1) {
-    var backups = api.env.control.ExecCmdById(storageEnvDomain, session, storageEnvMasterId, toJSON([{"command": "/root/getBackupsAllEnvs.sh", "params": ""}]), false).responses[0].out;
-    var backupList = toNative(new JSONObject(String(backups)));
+    var respUpdate = api.env.control.ExecCmdById(storageEnvDomain, session, storageEnvMasterId, toJSON([{"command": "/usr/bin/restic self-update 2>&1", "params": ""}]), false);
+    if (respUpdate.result != 0) return resp;
+    var backups = api.env.control.ExecCmdById(storageEnvDomain, session, storageEnvMasterId, toJSON([{"command": "/root/getBackupsAllEnvs.sh", "params": ""}]), false);
+    if (backups.result != 0) return resp;
+    var backupList = toNative(new JSONObject(String(backups.responses[0].out)));
     var envs = prepareEnvs(backupList.envs);
     var backups = prepareBackups(backupList.backups);
 } else {
@@ -19,10 +22,10 @@ if (resp.result == 11) {
 }
       
 function getStorageNodeid(){
-    let storageEnv = '${settings.storageName}'
-    var storageEnvShortName = storageEnv.split(".")[0]
-    let resp = api.environment.control.GetEnvInfo({ envName: storageEnvShortName })
-    if (resp.result != 0) return resp
+    let storageEnv = '${settings.storageName}';
+    var storageEnvShortName = storageEnv.split(".")[0];
+    let resp = api.environment.control.GetEnvInfo({ envName: storageEnvShortName });
+    if (resp.result != 0) return resp;
     
     let storageNode = resp.nodes.filter(node => (node.nodeGroup == 'storage' && node.ismaster))[0];
     if (!storageNode) return { result: Response.OBJECT_NOT_EXIST, error: "storage node not found" };
