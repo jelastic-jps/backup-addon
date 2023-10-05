@@ -144,6 +144,9 @@ function BackupManager(config) {
 		baseUrl : config.baseUrl
 	        }],
             [me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh update_restic'
+            ], backupCallParams ],
+            [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
 	    [me.cmd, [
