@@ -10,6 +10,21 @@ APP_PATH=$8
 USER_SESSION=$9
 USER_EMAIL=${10}
 
+if which restic 2>&1; then
+    true
+else
+    if which dnf 2>&1; then
+          dnf install -y epel-release 2>&1
+          dnf install -y restic 2>&1
+    else
+          yum-config-manager --disable nodesource 2>&1
+          yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/copart/restic/repo/epel-7/copart-restic-epel-7.repo 2>&1
+          yum-config-manager --enable copr:copr.fedorainfracloud.org:copart:restic 2>&1
+          yum -y install restic 2>&1
+          yum-config-manager --disable copr:copr.fedorainfracloud.org:copart:restic 2>&1
+    fi 
+fi
+
 function sendEmailNotification(){
     if [ -e "/usr/lib/jelastic/modules/api.module" ]; then
         [ -e "/var/run/jem.pid" ] && return 0;
@@ -32,6 +47,10 @@ function sendEmailNotification(){
     else
         echo $(date) ${ENV_NAME} "Email notification is not sent because this functionality is unavailable for current platform version." | tee -a $BACKUP_LOG_FILE;
     fi
+}
+
+function update_restic(){
+    restic self-update 2>&1;
 }
 
 function check_backup_repo(){
@@ -63,7 +82,7 @@ function rotate_snapshots(){
 function create_snapshot(){
     DUMP_NAME=$(date "+%F_%H%M%S")
     echo $(date) ${ENV_NAME} "Begin uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}  
-    { GOGC=20 RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup snapshot creation failed."; exit 1; }
+    { GOGC=20 RESTIC_READ_CONCURRENCY=8 RESTIC_PASSWORD=${ENV_NAME} restic -q -r /opt/backup/${ENV_NAME} backup --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup snapshot creation failed."; exit 1; }
     echo $(date) ${ENV_NAME} "End uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
 }
 
@@ -106,6 +125,9 @@ case "$1" in
         $1
         ;;
     create_snapshot)
+	$1
+        ;;
+    update_restic)
 	$1
         ;;
     *)
