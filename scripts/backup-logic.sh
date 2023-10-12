@@ -31,7 +31,7 @@ function sendEmailNotification(){
         CURRENT_PLATFORM_MAJOR_VERSION=$(jem api apicall -s --connect-timeout 3 --max-time 15 [API_DOMAIN]/1.0/statistic/system/rest/getversion 2>/dev/null |jq .version|grep -o [0-9.]*|awk -F . '{print $1}')
         if [ "${CURRENT_PLATFORM_MAJOR_VERSION}" -ge "7" ]; then
             echo $(date) ${ENV_NAME} "Sending e-mail notification about removing the stale lock" | tee -a $BACKUP_LOG_FILE;
-            SUBJECT="Slate lock is removed on /opt/backup/${ENV_NAME} backup repo"
+            SUBJECT="Stale lock is removed on /opt/backup/${ENV_NAME} backup repo"
             BODY="Please pay attention to /opt/backup/${ENV_NAME} backup repo because the stale lock left from previous operation is removed during the integrity check and backup rotation. Manual check of backup repo integrity and consistency is highly desired."
             jem api apicall -s --connect-timeout 3 --max-time 15 [API_DOMAIN]/1.0/message/email/rest/send --data-urlencode "session=$USER_SESSION" --data-urlencode "to=$USER_EMAIL" --data-urlencode "subject=$SUBJECT" --data-urlencode "body=$BODY"
             if [[ $? != 0 ]]; then
