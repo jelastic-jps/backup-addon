@@ -11,8 +11,11 @@ function BackupManager(config) {
      *  envAppid : {String}
      *  storageNodeId : {String}
      *  backupExecNode : {String}
+     *  [nodeGroup] : {String}
      *  [storageEnv] : {String}
      *  [backupCount] : {String}
+     *  [dbuser]: {String}
+     *  [dbpass]: {String}
      * }} config
      * @constructor
      */
@@ -24,13 +27,14 @@ function BackupManager(config) {
         Random = com.hivext.api.utils.Random,
         SimpleDateFormat = java.text.SimpleDateFormat,
         StrSubstitutor = org.apache.commons.lang3.text.StrSubstitutor,
-        Scripting = com.hivext.api.development.Scripting,
+	Scripting = com.hivext.api.development.Scripting,
         LoggerFactory = org.slf4j.LoggerFactory,
         LoggerName = "scripting.logger.backup-addon:" + config.envName,
         Logger = LoggerFactory.getLogger(LoggerName),
 
         me = this,
-        nodeManager, session;
+        nodeManager,
+        session;
 
     config = config || {};
     session = config.session;
@@ -38,16 +42,16 @@ function BackupManager(config) {
 
     me.invoke = function (action) {
         var actions = {
-            "install": me.install,
-            "uninstall": me.uninstall,
-            "backup": me.backup,
-            "restore": me.restore
+            "install"         : me.install,
+            "uninstall"       : me.uninstall,
+            "backup"          : me.backup,
+            "restore"         : me.restore
         };
 
         if (!actions[action]) {
             return {
-                result: Response.ERROR_UNKNOWN,
-                error: "unknown action [" + action + "]"
+                result : Response.ERROR_UNKNOWN,
+                error : "unknown action [" + action + "]"
             }
         }
 
@@ -58,58 +62,48 @@ function BackupManager(config) {
         var resp;
 
         return me.exec([
-            [me.cmd, ['echo $(date) %(envName) "Creating the backup task for %(envName) with the backup count %(backupCount), backup schedule %(cronTime) and backup storage env %(storageEnv)" | tee -a %(backupLogFile)'],
-            {
-                nodeId: config.backupExecNode,
-                envName: config.envName,
-                cronTime: config.cronTime,
-                storageEnv: config.storageEnv,
-                backupCount: config.backupCount,
-                backupLogFile: "/var/log/backup_addon.log"
+	    [ me.cmd, [
+                'echo $(date) %(envName) "Creating the backup task for %(envName) with the backup count %(backupCount), backup schedule %(cronTime) and backup storage env %(storageEnv)" | tee -a %(backupLogFile)'
+            ], {
+                nodeId : config.backupExecNode,
+                envName : config.envName,
+                cronTime : config.cronTime,
+                storageEnv : config.storageEnv,
+                backupCount : config.backupCount,
+                backupLogFile : "/var/log/backup_addon.log"
             }],
-            [me.createScript],
-            [me.clearScheduledBackups],
-            [me.scheduleBackup]
+            [ me.createScript   ],
+            [ me.clearScheduledBackups ],
+            [ me.scheduleBackup ]
         ]);
     };
 
     me.uninstall = function () {
         return me.exec(me.clearScheduledBackups);
     };
-
+	
     me.checkCurrentlyRunningBackup = function () {
-        var resp = me.exec([
-            [me.cmd, ['pgrep -f "%(envName)"_backup-logic.sh 1>/dev/null && echo "Running"; true'],
-            {
-                nodeId: config.backupExecNode,
-                envName: config.envName
+	var resp = me.exec([
+            [ me.cmd, [
+                'pgrep -f "%(envName)"_backup-logic.sh 1>/dev/null && echo "Running"; true'
+            ], {
+                nodeId : config.backupExecNode,
+                envName : config.envName
             }]
         ]);
-        if (resp.responses[0].out == "Running") {
-            return {
-                result: Response.ERROR_UNKNOWN,
-                error: "Another backup process is already running"
+	if (resp.responses[0].out == "Running") {
+	    return {
+                result : Response.ERROR_UNKNOWN,
+                error : "Another backup process is already running"
             }
-        } else {
-            return {
-                "result": 0
-            };
-        }
-    }
-
-    me.getStorageNodeId = function () {
-        let storageEnv = config.storageEnv
-        let resp = api.environment.control.GetEnvInfo({ envName: storageEnv.split(".")[0] })
-        if (resp.result != 0) return resp
-    
-        let storageNode = resp.nodes.filter(node => (node.nodeGroup == 'storage' && node.ismaster))[0];
-        if (!storageNode) return { result: Response.OBJECT_NOT_EXIST, error: "storage node not found" };
-    
-        return { result: 0, storageCtid : storageNode.id };
+	} else {
+	    return { "result": 0};
+	}
     }
 
     me.backup = function () {
-        var backupType, isManual = !getParam("task");
+        var backupType,
+            isManual = !getParam("task");
 
         if (isManual) {
             backupType = "manual";
@@ -120,150 +114,143 @@ function BackupManager(config) {
 	var backupCallParams = {
                 nodeId : config.backupExecNode,
                 envName : config.envName,
-                appPath: "/var/www/webroot/ROOT",
                 backupCount : config.backupCount,
                 backupLogFile : "/var/log/backup_addon.log",
                 baseUrl : config.baseUrl,
                 backupType : backupType,
-		session : session,
-		email : user.email
-        }
-
+                dbuser: config.dbuser,
+                dbpass: config.dbpass,
+                session : session,
+		            email : user.email
+            }
+        
         return me.exec([
-            [me.checkEnvStatus],
-            [me.checkStorageEnvStatus],
-            [me.checkCurrentlyRunningBackup],
-            [me.removeMount],
-            [me.addMountForBackup],
-            [me.cmd, [
+            [ me.checkEnvStatus ],
+            [ me.checkStorageEnvStatus ],
+	    [ me.checkCurrentlyRunningBackup ],
+	    [ me.checkCredentials ],
+            [ me.removeMounts ],
+            [ me.addMountForBackup ],
+            [ me.cmd, [
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
                 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
             ], {
 		nodeId : config.backupExecNode,
                 envName : config.envName,
 		baseUrl : config.baseUrl
-	        }],
+	    }],
             [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh update_restic'
             ], backupCallParams ],
-            [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
+            [ me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(dbuser) %(dbpass)' %(session) %(email)'
             ], backupCallParams ],
-	    [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+	    [ me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh backup %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(dbuser) %(dbpass)'
             ], backupCallParams ],
-	    [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh create_snapshot %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath)'
+	    [ me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh create_snapshot %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(dbuser) %(dbpass)' %(session) %(email)'
             ], backupCallParams ],
-            [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh rotate_snapshots %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
+            [ me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh rotate_snapshots %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(dbuser) %(dbpass)' %(session) %(email)'
             ], backupCallParams ],
-            [me.cmd, [
-                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
+            [ me.cmd, [
+                'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(dbuser) %(dbpass)' %(session) %(email)'
             ], backupCallParams ],
-            [me.removeMount]
+        [ me.removeMounts ]
         ]);
     };
 
     me.restore = function () {
         return me.exec([
-            [me.checkEnvStatus],
-            [me.checkStorageEnvStatus],
-            [me.checkCurrentlyRunningBackup],
-            [me.removeMount],
-            [me.addMountForRestore],
-            [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
-            {
-                nodeGroup: "cp",
-                envName: config.envName
+            [ me.checkEnvStatus ],
+            [ me.checkStorageEnvStatus ],
+	    [ me.checkCurrentlyRunningBackup ],
+	    [ me.checkCredentials ],
+            [ me.removeMounts ],
+            [ me.addMountForRestore ],
+            [ me.cmd, [
+		'echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 
+                'SNAPSHOT_ID=$(RESTIC_PASSWORD=$(cat /root/.backupedenv) restic -r /opt/backup/$(cat /root/.backupedenv) snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')',
+                '[ -n "${SNAPSHOT_ID}" ] || false',
+		'source /etc/jelastic/metainf.conf',
+		'RESTIC_PASSWORD=$(cat /root/.backupedenv) restic -r /opt/backup/$(cat /root/.backupedenv) restore ${SNAPSHOT_ID} --target /',
+		'if [ "$COMPUTE_TYPE" == "redis" ]; then rm -f /root/redis-restore.sh; wget -O /root/redis-restore.sh %(baseUrl)/scripts/redis-restore.sh; chmod +x /root/redis-restore.sh; bash /root/redis-restore.sh; else true; fi',
+		'[ "$COMPUTE_TYPE" == "postgres" ] && PGPASSWORD=%(dbpass) psql -U %(dbuser) -d postgres < /root/db_backup.sql || true',
+		'if [ "$COMPUTE_TYPE" == "mariadb" ] || [ "$COMPUTE_TYPE" == "mysql" ] || [ "$COMPUTE_TYPE" == "percona" ]; then mysql -h localhost -u %(dbuser) -p%(dbpass) --force < /root/db_backup.sql; else true; fi',
+		'jem service restart',
+		'if [ -n "$REPLICA_PSWD" ] && [ -n "$REPLICA_USER" ] ; then wget %(baseUrl)/scripts/setupUser.sh -O /root/setupUser.sh &>> /var/log/run.log; bash /root/setupUser.sh ${REPLICA_USER} ${REPLICA_PSWD} %(userEmail) %(envName) %(userSession); fi'
+            ], {
+                nodeId : config.backupExecNode,
+                envName : config.envName,
+		baseUrl : config.baseUrl,
+		dbuser: config.dbuser,
+		dbpass: config.dbpass,
+		userEmail: user.email,
+		userSession: session,
             }],
-            [me.cmd, [
-                'echo $(date) %(envName) Restoring the database from snapshot $(cat /root/.backupid)', 
-                '! which mysqld || service mysql start 2>&1', 
-                'for i in DB_HOST DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat %(appPath)/wp-config.php | grep ${i} |grep -v \'^[[:space:]]*#\' | tr -d \'[[:blank:]]\' | awk -F \',\' \'{print $2}\' | tr -d "\\"\');"|tr -d \'\\r\'|tail -n 1); done', 
-                'source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then wget -O /root/addAppDbUser.sh %(baseUrl)/scripts/addAppDbUser.sh; chmod +x /root/addAppDbUser.sh; bash /root/addAppDbUser.sh ${DB_USER} ${DB_PASSWORD} ${DB_HOST}; fi', 
-                'mysql -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} --execute="CREATE DATABASE IF NOT EXISTS ${DB_NAME};"', 'mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force < /root/wp_db_backup.sql'
-            ],
-            {
-                nodeId: config.backupExecNode,
-                envName: config.envName,
-                baseUrl: config.baseUrl,
-                appPath: "/var/www/webroot/ROOT"
-            }],
-            [me.cmd, ['rm -f /root/.backupid /root/wp_db_backup.sql', 'jem service start'],
-            {
-                nodeGroup: "cp",
-                envName: config.envName
-            }],
-            [me.removeMount]
-        ]);
+        [ me.removeMounts ]
+    ]);
+    }
+	
+    me.checkCredentials = function () {
+        var checkCredentialsCmd = "wget " + config.baseUrl + "/scripts/checkCredentials.sh -O /root/checkCredentials.sh &>> /var/log/run.log; chmod +x /root/checkCredentials.sh; bash /root/checkCredentials.sh checkCredentials " + config.dbuser + " " + config.dbpass;
+        resp = jelastic.env.control.ExecCmdById(config.envName, session, config.backupExecNode, toJSON([{ command: checkCredentialsCmd }]), true, "root");
+        if (resp.result != 0) {
+            var title = "Database credentials specified in Backup add-on for " + config.envName + " are incorrect",
+                text = "Database credentials specified in Backup add-on for " + config.envName + " are incorrect. Please specify the right username and password in add-on settings.";
+            try {
+                jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+            } catch (ex) {
+                emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+            }
+	    return {
+                result : Response.ERROR_UNKNOWN,
+                error : "DB credentials set in Backup add-on for " + config.envName + " are wrong"
+            }
+        }
+        return { result : 0 };
     }
 
     me.addMountForBackup = function addMountForBackup() {
-	var resp = me.getStorageNodeId();
-	if (resp.result != 0) {
-            throw new Error("can't get backup storage node id: " + toJSON(resp));
-        }
-	var currentStorageNodeId = resp.storageCtid;
-        var delay = (Math.floor(Math.random() * 50) * 1000);
-	    java.lang.Thread.sleep(delay);
-        resp = api.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', currentStorageNodeId, 'WPBackupRestore', false);
-        if (resp.result != 0) {
-	    if (resp.result != 2031) {
-                var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-	    }
-        }
-	return {
-            "result": 0
-        };
+	var delay = (Math.floor(Math.random() * 50) * 1000);
+	java.lang.Thread.sleep(delay);
+        return me.addMountForRestore();
     }
-
+	
     me.addMountForRestore = function addMountForRestore() {
-	var resp = me.getStorageNodeId();
-	if (resp.result != 0) {
-            throw new Error("can't get backup storage node id: " + toJSON(resp));
-        }
-	var currentStorageNodeId = resp.storageCtid;
-        resp = api.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
+	var resp = jelastic.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'DBBackupRestore', false);
         if (resp.result != 0) {
-	    if (resp.result != 2031) {
-                var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-	    }
+            var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+            try {
+                jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+            } catch (ex) {
+                emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+            }
         }
-        return {
-            "result": 0
-        };
+        return resp;
     }
 
-    me.removeMount = function removeMount() {
-        resp = api.env.control.GetEnvInfo(config.envName, session);
-        if (resp.result != 0) {
-            return resp;
-        }
-	var cpNodes = resp.nodes;
-        for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
-            var allMounts = api.env.file.GetMountPoints(config.envName, session, cpNodes[currentNode].id).array;
-            for (var i = 0, n = allMounts.length; i < n; i++) {
-                if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                    resp = api.env.file.RemoveMountPointById(config.envName, session, cpNodes[currentNode].id, "/opt/backup");
-                    if (resp.result != 0) {
-                        return resp;
-                    }
+    me.removeMounts = function removeMountForBackup() {
+        var allMounts = jelastic.env.file.GetMountPoints(config.envName, session, config.backupExecNode).array;
+        for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (allMounts[i].path == "/opt/backup" && allMounts[i].type == "INTERNAL") {
+                return jelastic.env.file.RemoveMountPointById(config.envName, session, config.backupExecNode, "/opt/backup");
+                if (resp.result != 0) {
+                    return resp;
                 }
             }
-        }   
+        }
+        allMounts = jelastic.env.file.GetMountPoints(config.envName, session).array;
+        for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (allMounts[i].path == "/opt/backup" && allMounts[i].type == "INTERNAL") {
+                return jelastic.env.file.RemoveMountPointByGroup(config.envName, session, config.nodeGroup, "/opt/backup");
+                if (resp.result != 0) {
+                    return resp;
+                }
+            }
+        }
         return {
             "result": 0
         };
@@ -272,49 +259,38 @@ function BackupManager(config) {
     me.checkEnvStatus = function checkEnvStatus() {
         if (!nodeManager.isEnvRunning()) {
             return {
-                result: EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
-                error: _("env [%(name)] not running", {
-                    name: config.envName
-                })
+                result : EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
+                error : _("env [%(name)] not running", {name : config.envName})
             };
         }
 
-        return {
-            result: 0
-        };
+        return { result : 0 };
     };
-
+	
     me.checkStorageEnvStatus = function checkStorageEnvStatus() {
-        if (typeof config.storageEnv !== 'undefined') {
-            var resp = api.env.control.GetEnvInfo(config.storageEnv, session);
-            if (resp.result === 11) {
+        if(typeof config.storageEnv !== 'undefined'){
+            var resp = jelastic.env.control.GetEnvInfo(config.storageEnv, session);
+            if (resp.result === 11){
                 return {
-                    result: EnvironmentResponse.ENVIRONMENT_NOT_EXIST,
-                    error: _("Storage env [%(name)] is deleted", {
-                        name: config.storageEnv
-                    })
+                    result : EnvironmentResponse.ENVIRONMENT_NOT_EXIST,
+                    error : _("Storage env [%(name)] is deleted", {name : config.storageEnv})
                 };
             } else if (resp.env.status === 2) {
                 return {
-                    result: EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
-                    error: _("Storage env [%(name)] not running", {
-                        name: config.storageEnv
-                    })
+                    result : EnvironmentResponse.ENVIRONMENT_NOT_RUNNING,
+                    error : _("Storage env [%(name)] not running", {name : config.storageEnv})
                 };
             }
-            return {
-                result: 0
-            };
+            return { result : 0 };
         };
-        return {
-            result: 0
-        };
+        return { result : 0 };
     };
 
     me.createScript = function createScript() {
         var url = me.getScriptUrl("backup-main.js"),
             scriptName = config.scriptName,
-            scriptBody, resp;
+            scriptBody,
+            resp;
 
         try {
             scriptBody = new Transport().get(url);
@@ -322,20 +298,17 @@ function BackupManager(config) {
             scriptBody = me.replaceText(scriptBody, config);
 
             //delete the script if it already exists
-            api.dev.scripting.DeleteScript(scriptName);
+            jelastic.dev.scripting.DeleteScript(scriptName);
 
             //create a new script
-            resp = api.dev.scripting.CreateScript(scriptName, "js", scriptBody);
+            resp = jelastic.dev.scripting.CreateScript(scriptName, "js", scriptBody);
 
             java.lang.Thread.sleep(1000);
 
             //build script to avoid caching
-            api.dev.scripting.Build(scriptName);
+            jelastic.dev.scripting.Build(scriptName);
         } catch (ex) {
-            resp = {
-                result: Response.ERROR_UNKNOWN,
-                error: toJSON(ex)
-            };
+            resp = { result : Response.ERROR_UNKNOWN, error: toJSON(ex) };
         }
 
         return resp;
@@ -343,32 +316,27 @@ function BackupManager(config) {
 
 
     me.scheduleBackup = function scheduleBackup() {
-        var quartz = CronToQuartzConverter.convert(config.cronTime);
+        var quartz = new CronToQuartzConverter().convert(config.cronTime);
 
         for (var i = quartz.length; i--;) {
-            var resp = api.utils.scheduler.CreateEnvTask({
+            var resp = jelastic.utils.scheduler.CreateEnvTask({
                 appid: appid,
                 envName: config.envName,
                 session: session,
                 script: config.scriptName,
                 trigger: "cron:" + quartz[i],
-                params: {
-                    task: 1,
-                    action: "backup"
-                }
+                params: { task: 1, action : "backup" }
             });
 
             if (resp.result !== 0) return resp;
         }
 
-        return {
-            result: 0
-        };
+        return { result: 0 };
     };
 
     me.clearScheduledBackups = function clearScheduledBackups() {
         var envAppid = config.envAppid,
-            resp = api.utils.scheduler.GetTasks(envAppid, session);
+            resp = jelastic.utils.scheduler.GetTasks(envAppid, session);
 
         if (resp.result != 0) return resp;
 
@@ -376,7 +344,7 @@ function BackupManager(config) {
 
         for (var i = tasks.length; i--;) {
             if (tasks[i].script == config.scriptName) {
-                resp = api.utils.scheduler.RemoveTask(envAppid, session, tasks[i].id);
+                resp = jelastic.utils.scheduler.RemoveTask(envAppid, session, tasks[i].id);
 
                 if (resp.result != 0) return resp;
             }
@@ -402,23 +370,25 @@ function BackupManager(config) {
     };
 
     me.exec = function (methods, oScope, bBreakOnError) {
-        var scope, resp, fn;
+        var scope,
+            resp,
+            fn;
 
         if (!methods.push) {
-            methods = [Array.prototype.slice.call(arguments)];
+            methods = [ Array.prototype.slice.call(arguments) ];
             onFail = null;
             bBreakOnError = true;
         }
 
         for (var i = 0, n = methods.length; i < n; i++) {
             if (!methods[i].push) {
-                methods[i] = [methods[i]];
+                methods[i] = [ methods[i] ];
             }
 
             fn = methods[i][0];
             methods[i].shift();
 
-            log(fn.name + (methods[i].length > 0 ? ": " + methods[i] : ""));
+            log(fn.name + (methods[i].length > 0 ?  ": " + methods[i] : ""));
             scope = oScope || (methods[methods.length - 1] || {}).scope || this;
             resp = fn.apply(scope, methods[i]);
 
@@ -438,20 +408,12 @@ function BackupManager(config) {
 
         return resp;
     };
-    
-    var CronToQuartzConverter = use("https://raw.githubusercontent.com/jelastic-jps/common/main/CronToQuartzConverter");
-
-    function use(script) {
-        var Transport = com.hivext.api.core.utils.Transport,
-            body = new Transport().get(script + "?_r=" + Math.random());
-
-        return new(new Function("return " + body)())(session);
-    }
 
     function NodeManager(envName, storageEnv, nodeId, baseDir, logPath) {
         var ENV_STATUS_TYPE_RUNNING = 1,
             me = this,
-            storageEnvInfo, envInfo;
+            storageEnvInfo,
+            envInfo;
 
         me.isEnvRunning = function () {
             var resp = me.getEnvInfo();
@@ -467,7 +429,7 @@ function BackupManager(config) {
             var resp;
 
             if (!envInfo) {
-                resp = api.env.control.GetEnvInfo(envName, session);
+                resp = jelastic.env.control.GetEnvInfo(envName, session);
                 if (resp.result != 0) return resp;
 
                 envInfo = resp;
@@ -475,18 +437,19 @@ function BackupManager(config) {
 
             return envInfo;
         };
-
+        
         me.getStorageEnvInfo = function () {
             var resp;
             if (!storageEnvInfo) {
-                resp = api.env.control.GetEnvInfo(config.storageEnv, session);
+                resp = jelastic.env.control.GetEnvInfo(config.storageEnv, session);
                 storageEnvInfo = resp;
             }
             return storageEnvInfo;
         };
 
         me.cmd = function (cmd, values, sep, disableLogging) {
-            var resp, command;
+            var resp,
+                command;
 
             values = values || {};
             values.log = values.log || logPath;
@@ -499,31 +462,195 @@ function BackupManager(config) {
             }
 
             if (values.nodeGroup) {
-                resp = api.env.control.ExecCmdByGroup(envName, session, values.nodeGroup, toJSON([{
-                    command: command
-                }]), true, false, "root");
+                resp = jelastic.env.control.ExecCmdByGroup(envName, session, values.nodeGroup, toJSON([{ command: command }]), true, false, "root");
             } else {
-                resp = api.env.control.ExecCmdById(envName, session, values.nodeId, toJSON([{
-                    command: command
-                }]), true, "root");
+                resp = jelastic.env.control.ExecCmdById(envName, session, values.nodeId, toJSON([{ command: command }]), true, "root");
             }
-
-            if (resp.result != 0) {
-                var title = "Backup failed for " + config.envName,
-                    text = "Backup failed for the environment " + config.envName + " of " + user.email + " with error message " + resp.responses[0].errOut;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-            }
+        
+        if (resp.result != 0) {
+        var title = "Backup failed for " + config.envName,
+                text = "Backup failed for the environment " + config.envName + " of " + user.email + " with error message " + resp.responses[0].errOut;
+        try {
+                    jelastic.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+        } catch (ex) {
+            emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+        }
+        }
             return resp;
         };
     }
 
+
+    function CronToQuartzConverter() {
+        this.getQuartz = function (cron) {
+            var data = [];
+            var quartzEntry;
+
+            // check for cron magic entries
+            quartzEntry = parseCronMagics(cron);
+
+            if (quartzEntry) {
+                data.push(quartzEntry);
+            } else {
+
+                // if cron magic entries not found, proceed to parsing normal cron format
+                var crontabEntry = cron.split(' ');
+                quartzEntry = parseCronSyntax(crontabEntry);
+
+                data.push(quartzEntry);
+
+                if (crontabEntry[2] !== '*' && crontabEntry[4] !== '*') {
+
+                    crontabEntry[2] = '*';
+
+                    quartzEntry = parseCronSyntax(crontabEntry);
+                    data.push(quartzEntry);
+                }
+
+            }
+
+            return data;
+        };
+
+        this.convert = function (cron) {
+            var arr = this.getQuartz(cron);
+
+            for (var i = 0, l = arr.length; i < l; i++) {
+                arr[i] = arr[i].join(' ');
+            }
+
+            return arr;
+        };
+
+        function advanceNumber(str) {
+
+            var quartzCompatibleStr = '';
+            var num;
+            str.split('').forEach(function (chr) {
+
+                num = parseInt(chr);
+
+                // char is an actual number
+                if (!isNaN(num)) {
+                    // number is in allowed range
+                    if (num >= 0 && num <= 7) {
+                        quartzCompatibleStr += num + 1;
+                    } else {
+                        // otherwise default to 1, beginning of the week
+                        quartzCompatibleStr = 1;
+                    }
+                } else {
+                    quartzCompatibleStr += chr;
+                }
+
+
+
+            });
+
+            return quartzCompatibleStr;
+        }
+
+        function parseCronSyntax(crontabEntry) {
+
+            var quartzEntry = [];
+
+            // first we initialize the seconds to 0 by default because linux CRON entries do not include a seconds definition
+            quartzEntry.push('0');
+
+            // quartz scheduler can't handle an OR definition, and so it doesn't support both DOM and DOW fields to be defined
+            // for this reason we need to shift one of them to be the value or * and the other to be ?
+            var toggleQuartzCompat = false;
+
+            crontabEntry.forEach(function (item, index, array) {
+
+
+                // index 0 = minutes
+                // index 1 = hours
+                // these cron definitions should be compatible with quartz so we push them as is
+                if (index === 0 || index === 1) {
+                    quartzEntry.push(item);
+                }
+
+                // index 2 = DOM = Day of Month
+                if (index === 2) {
+                    if (item !== '?') {
+                        toggleQuartzCompat = true;
+                    }
+
+                    if (item === '*') {
+                        toggleQuartzCompat = false;
+                        item = '?';
+                    }
+
+                    quartzEntry.push(item);
+                }
+
+                // index 3 = Month
+                if (index === 3) {
+                    quartzEntry.push(item);
+                }
+
+                // index 4 = DOW = Day of Week
+                if (index === 4) {
+
+                    // day of week needs another adjustments - it is specified as 1-7 in quartz but 0-6 in crontab
+                    var itemAbbreviated = advanceNumber(item);
+
+                    if (toggleQuartzCompat === true) {
+                        quartzEntry.push('?');
+                    } else {
+                        quartzEntry.push(itemAbbreviated);
+                    }
+                }
+
+                if (index >= 5) {
+                    return true;
+                }
+
+            });
+
+            quartzEntry.push('*');
+
+            return quartzEntry;
+
+        }
+
+        function parseCronMagics(crontab) {
+
+            var quartzEntry = false;
+
+            // @hourly
+            if (crontab.indexOf('@hourly') === 0) {
+                quartzEntry = ['0', '0', '*', '*', '*', '?', '*'];
+            }
+
+            // @daily and @midnight
+            if (crontab.indexOf('@daily') === 0 || crontab.indexOf('@midnight') === 0) {
+                quartzEntry = ['0', '0', '0', '*', '*', '?', '*'];
+            }
+
+            // @weekly
+            if (crontab.indexOf('@weekly') === 0) {
+                quartzEntry = ['0', '0', '0', '?', '*', '1', '*'];
+            }
+
+            // @monthly
+            if (crontab.indexOf('@monthly') === 0) {
+                quartzEntry = ['0', '0', '0', '1', '*', '?', '*'];
+            }
+
+            // @yearly and @annually
+            if (crontab.indexOf('@yearly') === 0 || crontab.indexOf('@annually') === 0) {
+                quartzEntry = ['0', '0', '0', '1', '1', '?', '*'];
+            }
+
+            return quartzEntry || false;
+        }
+    }
+
     function log(message) {
         Logger.debug(message);
-        return api.marketplace.console.WriteLog(appid, session, message);
+        return jelastic.marketplace.console.WriteLog(appid, session, message);
     }
 
     function _(str, values) {
