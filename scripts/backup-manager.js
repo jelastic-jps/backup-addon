@@ -139,7 +139,7 @@ function BackupManager(config) {
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
                 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
             ], {
-		nodeId : config.backupExecNode,
+		nodeGroup: "cp",
                 envName : config.envName,
 		baseUrl : config.baseUrl
 	        }],
