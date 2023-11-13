@@ -319,7 +319,7 @@ function BackupManager(config) {
             scriptName = config.scriptName,
             scriptBody, resp;
 
-	var targetAppid = api.dev.apps.CreatePersistence ? "${env.appid}" : appid
+	var targetAppid = api.dev.apps.CreatePersistence ? config.envAppid : appid
 
         try {
             scriptBody = new Transport().get(url);
