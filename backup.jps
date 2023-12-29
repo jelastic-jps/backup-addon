@@ -260,16 +260,14 @@ actions:
 
   callScript:
     script: |-
-      var targetAppid = api.dev.apps.CreatePersistence ? "${env.appid}" : appid;
-      var resp = api.dev.scripting.Eval(targetAppid, session, '${env.envName}-${globals.scriptSufix}', {action:"${this}"});
+      var resp = api.dev.scripting.Eval(appid, session, '${env.envName}-${globals.scriptSufix}', {action:"${this}"});
       return resp.response || resp;
       
   removeScript:
     script: |-
-      var targetAppid = api.dev.apps.CreatePersistence ? "${env.appid}" : appid;
-      var resp = api.dev.scripting.GetScript(targetAppid, session, '${env.envName}-${globals.scriptSufix}');
+      var resp = api.dev.scripting.GetScript(appid, session, '${env.envName}-${globals.scriptSufix}');
       if (resp.result === 0) {
-          var resp = api.dev.scripting.DeleteScript(targetAppid, session, '${env.envName}-${globals.scriptSufix}');
+          var resp = api.dev.scripting.DeleteScript(appid, session, '${env.envName}-${globals.scriptSufix}');
           return resp.response || resp;
       }
       return { result: 0 };
