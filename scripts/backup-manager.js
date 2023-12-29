@@ -319,23 +319,21 @@ function BackupManager(config) {
             scriptName = config.scriptName,
             scriptBody, resp;
 
-	var targetAppid = api.dev.apps.CreatePersistence ? config.envAppid : appid
-
         try {
             scriptBody = new Transport().get(url);
 
             scriptBody = me.replaceText(scriptBody, config);
 
             //delete the script if it already exists
-            api.dev.scripting.DeleteScript(targetAppid, session, scriptName);
+            api.dev.scripting.DeleteScript(scriptName);
 
             //create a new script
-            resp = api.dev.scripting.CreateScript(targetAppid, session, scriptName, "js", scriptBody);
+            resp = api.dev.scripting.CreateScript(scriptName, "js", scriptBody);
 
             java.lang.Thread.sleep(1000);
 
             //build script to avoid caching
-            api.dev.scripting.Build(targetAppid, session, scriptName);
+            api.dev.scripting.Build(scriptName);
         } catch (ex) {
             resp = {
                 result: Response.ERROR_UNKNOWN,
