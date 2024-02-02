@@ -80,7 +80,7 @@ function rotate_snapshots(){
 }
 
 function create_snapshot(){
-    DUMP_NAME=$(date "+%F_%H%M%S")
+    DUMP_NAME=$(date "+%F_%H%M%S_%Z")
     echo $(date) ${ENV_NAME} "Begin uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}  
     { GOGC=20 RESTIC_COMPRESSION=off RESTIC_PACK_SIZE=8 RESTIC_READ_CONCURRENCY=8 RESTIC_PASSWORD=${ENV_NAME} restic backup -q -r /opt/backup/${ENV_NAME} --tag "${DUMP_NAME} ${BACKUP_ADDON_COMMIT_ID} ${BACKUP_TYPE}" ${APP_PATH} ~/wp_db_backup.sql | tee -a $BACKUP_LOG_FILE; } || { echo "Backup snapshot creation failed."; exit 1; }
     echo $(date) ${ENV_NAME} "End uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
