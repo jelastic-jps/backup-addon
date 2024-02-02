@@ -261,7 +261,11 @@ actions:
   callScript:
     script: |-
       var resp = api.dev.scripting.Eval(appid, session, '${env.envName}-${globals.scriptSufix}', {action:"${this}"});
-      return resp.response || resp;
+      if (resp.result === 1702 && "${this}" == "uninstall") {
+          return { result: 0, out: "script not found" };
+      } else {
+          return resp.response || resp;
+      }
       
   removeScript:
     script: |-
