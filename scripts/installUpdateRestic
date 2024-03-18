@@ -1,0 +1,17 @@
+#!/bin/bash
+
+RESTIC_LATEST_VERSION="timeout 60 git ls-remote --tags https://github.com/restic/restic.git 2>/dev/null|grep -v alpha|grep -v rc|grep -v "{}"|grep -v doc|awk -F / '{print $3}'|grep -o [0-9.]*|sort -V|tail -n 1"
+[ -n "${RESTIC_LATEST_VERSION}" ] || RESTIC_LATEST_VERSION="0.16.4"
+
+function forceInstallUpdateRestic(){
+    repo_url=$(curl -s https://api.github.com/repos/restic/restic/releases/latest|grep browser_download_url|grep linux_amd64|awk '{print $2}'|tr -d \")
+    [ -n "${repo_url}" ] || repo_url="https://github.com/restic/restic/releases/download/v${RESTIC_LATEST_VERSION}/restic_${RESTIC_LATEST_VERSION}_linux_amd64.bz2"
+    wget -O restic.bz2 $repo_url 2>&1 && bzip2 -d restic.bz2 && rm -f restic.bz2 && \
+    strip restic && mv -f restic /usr/bin/restic && chmod +x /usr/bin/restic;
+}
+
+if which restic 2>&1; then
+    restic self-update || forceInstallUpdateRestic
+else
+    forceInstallUpdateRestic
+fi
