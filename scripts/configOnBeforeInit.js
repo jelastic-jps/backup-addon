@@ -6,7 +6,9 @@ var nodes = {};
 var currentStorageExists = false;
 var scheduleType = '${settings.scheduleType}';
 for (var i = 0, envInfo, env; envInfo = resp.infos[i]; i++) {
-    if (envInfo.envGroups.includes("WP Backup") || envInfo.envGroups.includes("Backup storage nodes")) {
+    if (envInfo.envGroups.includes("WP Backup") || 
+        envInfo.envGroups.includes("Backup storage nodes") || 
+       (envInfo.env.properties && envInfo.env.properties.projectScope == "backup") {
         env = envInfo.env
         if (env.status == 1) {
             for (var j = 0, node; node = envInfo.nodes[j]; j++) {
