@@ -290,7 +290,7 @@ actions:
 
   deleteDBdump:
     - cmd[${targetNodes.nodeGroup}]: |-
-        [ -f /root/db_backup.sql ] && rm -f /root/db_backup.sql
+        [ -f /root/wp_db_backup.sql ] && rm -f /root/wp_db_backup.sql || exit 0;
       user: root    
   
   configure:
