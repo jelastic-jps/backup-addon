@@ -66,6 +66,7 @@ function BackupManager(config) {
                 cronTime: config.cronTime,
                 storageEnv: config.storageEnv,
                 backupCount: config.backupCount,
+		isAlwaysUmount : config.isAlwaysUmount,
                 backupLogFile: "/var/log/backup_addon.log"
             }],
             [me.createScript],
@@ -202,8 +203,7 @@ function BackupManager(config) {
             [me.cmd, ['rm -f /root/.backupid /root/wp_db_backup.sql', 'jem service start'],
             {
                 nodeGroup: "cp",
-                envName: config.envName,
-		isAlwaysUmount: config.isAlwaysUmount
+                envName: config.envName
             }],
             [me.removeMount, config.isAlwaysUmount]
         ]);
