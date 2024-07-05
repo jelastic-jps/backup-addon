@@ -6,6 +6,7 @@ var scriptName        = getParam("scriptName", "${env.envName}-wp-backup"),
     envAppid          = getParam("envAppid", "${env.appid}"),
     userId            = getparam("userId", ""),
     backupCount       = getParam("backupCount", "5"),
+    isAlwaysUmount    = getParam("isAlwaysUmount"),
     storageNodeId     = getParam("storageNodeId"),
     backupExecNode    = getParam("backupExecNode"),
     storageEnv        = getParam("storageEnv");
@@ -21,6 +22,7 @@ function run() {
         envName           : envName,
         envAppid          : envAppid,
         backupCount       : backupCount,
+        isAlwaysUmount    : isAlwaysUmount,
         storageNodeId     : storageNodeId,
         backupExecNode    : backupExecNode,
         storageEnv        : storageEnv
