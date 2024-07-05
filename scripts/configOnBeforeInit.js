@@ -130,6 +130,7 @@ if (scheduleType == '1') {
 }
 
 jps.settings.main.fields[2].default = '${settings.backupCount}';
+jps.settings.main.fields[3].value = ${settings.isAlwaysUmount};
 
 if (storage_unavailable_markup.length > 0) {
     jps.settings.main.fields.push(
