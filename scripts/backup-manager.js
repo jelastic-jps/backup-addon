@@ -10,6 +10,7 @@ function BackupManager(config) {
      *  envName : {String}
      *  envAppid : {String}
      *  storageNodeId : {String}
+     *  isAlwaysUmount : {Boolean}
      *  backupExecNode : {String}
      *  [storageEnv] : {String}
      *  [backupCount] : {String}
@@ -125,6 +126,7 @@ function BackupManager(config) {
                 backupLogFile : "/var/log/backup_addon.log",
                 baseUrl : config.baseUrl,
                 backupType : backupType,
+		isAlwaysUmount : config.isAlwaysUmount,
 		session : session,
 		email : user.email
         }
@@ -133,8 +135,8 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMount],
-            [me.addMountForBackup],
+            [me.removeMounts, config.isAlwaysUmount],
+            [me.addMountForBackup, config.isAlwaysUmount],
             [me.cmd, [
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
                 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
@@ -164,7 +166,7 @@ function BackupManager(config) {
             [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
-            [me.removeMount]
+            [me.removeMounts, config.isAlwaysUmount]
         ]);
     };
 
@@ -173,8 +175,8 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMount],
-            [me.addMountForRestore],
+            [me.removeMounts, config.isAlwaysUmount],
+            [me.addMountForRestore, config.isAlwaysUmount],
             [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'restic self-update 2>&1', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR GOGC=20 restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
             {
                 nodeGroup: "cp",
@@ -196,7 +198,8 @@ function BackupManager(config) {
             [me.cmd, ['rm -f /root/.backupid /root/wp_db_backup.sql', 'jem service start'],
             {
                 nodeGroup: "cp",
-                envName: config.envName
+                envName: config.envName,
+		isAlwaysUmount: config.isAlwaysUmount
             }],
             [me.removeMount]
         ]);
