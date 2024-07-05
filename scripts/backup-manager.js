@@ -135,7 +135,7 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMounts, config.isAlwaysUmount],
+            [me.removeMount, config.isAlwaysUmount],
             [me.addMountForBackup, config.isAlwaysUmount],
             [me.cmd, [
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
@@ -166,7 +166,7 @@ function BackupManager(config) {
             [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
-            [me.removeMounts, config.isAlwaysUmount]
+            [me.removeMount, config.isAlwaysUmount]
         ]);
     };
 
@@ -175,7 +175,7 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMounts, config.isAlwaysUmount],
+            [me.removeMount, config.isAlwaysUmount],
             [me.addMountForRestore, config.isAlwaysUmount],
             [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'restic self-update 2>&1', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR GOGC=20 restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
             {
@@ -201,11 +201,11 @@ function BackupManager(config) {
                 envName: config.envName,
 		isAlwaysUmount: config.isAlwaysUmount
             }],
-            [me.removeMount]
+            [me.removeMount, config.isAlwaysUmount]
         ]);
     }
 
-    me.addMountForBackup = function addMountForBackup() {
+    me.addMountForBackup = function addMountForBackup(isAlwaysUmount) {
 	var resp = me.getStorageNodeId();
 	if (resp.result != 0) {
             throw new Error("can't get backup storage node id: " + toJSON(resp));
@@ -213,21 +213,25 @@ function BackupManager(config) {
 	var currentStorageNodeId = resp.storageCtid;
         var delay = (Math.floor(Math.random() * 50) * 1000);
 	    java.lang.Thread.sleep(delay);
-        resp = api.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', currentStorageNodeId, 'WPBackupRestore', false);
-        if (resp.result != 0) {
-	    if (resp.result != 2031) {
-                var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-	    }
+
+	isAlwaysUmount = String(isAlwaysUmount) || false;
+        isAlwaysUmount = me.initBoolValue(isAlwaysUmount)
+        if (isAlwaysUmount) {    
+            resp = api.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', currentStorageNodeId, 'WPBackupRestore', false);
+            if (resp.result != 0) {
+	        if (resp.result != 2031) {
+                    var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                        text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+                    try {
+                        api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                    } catch (ex) {
+                        emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+                    }
+	        }
+            }
+	    return resp;
         }
-	return {
-            "result": 0
-        };
+	return { result : 0 };
     }
 
     me.addMountForRestore = function addMountForRestore() {
