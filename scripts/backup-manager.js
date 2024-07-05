@@ -264,7 +264,7 @@ function BackupManager(config) {
 	return { result : 0 };
     }
 
-    me.removeMount = function removeMount() {
+    me.removeMount = function removeMount(isAlwaysUmount) {
         resp = api.env.control.GetEnvInfo(config.envName, session);
         if (resp.result != 0) {
             return resp;
