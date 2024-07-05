@@ -15,6 +15,7 @@ function run() {
         storageNodeId     : "${storageNodeId}",
         backupExecNode 	  : "${backupExecNode}",
         backupCount       : "${backupCount}",
+        isAlwaysUmount    : "${isAlwaysUmount}",
         storageEnv        : "${storageEnv}"
     });
 
