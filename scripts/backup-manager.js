@@ -109,6 +109,10 @@ function BackupManager(config) {
         return { result: 0, storageCtid : storageNode.id };
     }
 
+    me.initBoolValue = function initBoolValue(value) {
+        return typeof value == "boolean" ? value : String(value) != "false";
+    };
+	
     me.backup = function () {
         var backupType, isManual = !getParam("task");
 
@@ -234,27 +238,30 @@ function BackupManager(config) {
 	return { result : 0 };
     }
 
-    me.addMountForRestore = function addMountForRestore() {
+    me.addMountForRestore = function addMountForRestore(isAlwaysUmount) {
 	var resp = me.getStorageNodeId();
 	if (resp.result != 0) {
             throw new Error("can't get backup storage node id: " + toJSON(resp));
         }
 	var currentStorageNodeId = resp.storageCtid;
-        resp = api.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
-        if (resp.result != 0) {
-	    if (resp.result != 2031) {
-                var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-	    }
-        }
-        return {
-            "result": 0
-        };
+	isAlwaysUmount = String(isAlwaysUmount) || false;
+        isAlwaysUmount = me.initBoolValue(isAlwaysUmount)
+        if (isAlwaysUmount) {    
+            resp = api.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
+            if (resp.result != 0) {
+	        if (resp.result != 2031) {
+                    var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                        text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+                    try {
+                        api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                    } catch (ex) {
+                        emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+                    }
+	        }
+            }
+            return resp;
+	}
+	return { result : 0 };
     }
 
     me.removeMount = function removeMount() {
@@ -263,20 +270,20 @@ function BackupManager(config) {
             return resp;
         }
 	var cpNodes = resp.nodes;
-        for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
-            var allMounts = api.env.file.GetMountPoints(config.envName, session, cpNodes[currentNode].id).array;
-            for (var i = 0, n = allMounts.length; i < n; i++) {
-                if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                    resp = api.env.file.RemoveMountPointById(config.envName, session, cpNodes[currentNode].id, "/opt/backup");
-                    if (resp.result != 0) {
-                        return resp;
+	isAlwaysUmount = String(isAlwaysUmount) || false;
+        isAlwaysUmount = me.initBoolValue(isAlwaysUmount)
+	if (isAlwaysUmount) {
+            for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
+                var allMounts = api.env.file.GetMountPoints(config.envName, session, cpNodes[currentNode].id).array;
+                for (var i = 0, n = allMounts.length; i < n; i++) {
+                    if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
+                        resp = api.env.file.RemoveMountPointById(config.envName, session, cpNodes[currentNode].id, "/opt/backup");
+                        if (resp.result != 0) { return resp; }
                     }
                 }
             }
-        }   
-        return {
-            "result": 0
-        };
+	}
+	return { result: 0 }
     }
 
     me.checkEnvStatus = function checkEnvStatus() {
