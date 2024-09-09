@@ -278,6 +278,7 @@ actions:
 
   backup:
     - callScript: backup
+    - deleteDBdump
     
   restore:
     - cmd[cp]: |-
@@ -285,7 +286,13 @@ actions:
         echo "${settings.backupDir}" > /root/.backupid
       user: root
     - callScript: restore
-    
+    - deleteDBdump
+
+  deleteDBdump:
+    - cmd[${targetNodes.nodeGroup}]: |-
+        [ -f /root/wp_db_backup.sql ] && rm -f /root/wp_db_backup.sql || exit 0;
+      user: root    
+  
   configure:
     - setSchedule
         
