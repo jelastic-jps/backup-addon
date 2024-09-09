@@ -121,6 +121,12 @@ settings:
         min: 1
         max: 30
         default: 5
+      - type: toggle
+        name: isAlwaysUmount
+        caption: Always umount
+        tooltip: "Always unmount backup storage when backup/restore is finished." 
+        value: false
+        hidden: false
     onBeforeInit: scripts/configOnBeforeInit.js
         
   restore:
@@ -190,6 +196,7 @@ onAfterClone:
       sat: ${settings.sat}
       tz: ${settings.tz}    
       backupCount: ${settings.backupCount}
+      isAlwaysUmount: ${settings.isAlwaysUmount}
 
 onAfterConfirmTransfer: setSchedule
 
@@ -257,6 +264,7 @@ actions:
         storageNodeId: ${response.storageCtid}
         backupExecNode: ${nodes.cp.master.id}
         storageEnv: ${response.storageEnvShortName}
+        isAlwaysUmount: ${this.isAlwaysUmount}
 
   callScript:
     script: |-
@@ -331,11 +339,42 @@ actions:
   setSchedule:
     - setGlobals: 
         storageEnv: ${settings.storageName}
+        isAlwaysUmount: ${settings.isAlwaysUmount}
     - if ("${settings.scheduleType}" == 2):
       - convert
     - else:
       - setGlobals:
           cron: ${settings.cronTime}
+    - if ("${settings.isAlwaysUmount}" == "true"):
+      - removePermanentMount
+    - else:
+      - removePermanentMount
+      - addPermanentMount
     - installScript:
         cronTime: ${globals.cron}
         backupCount: ${settings.backupCount}
+        isAlwaysUmount: ${globals.isAlwaysUmount}
+
+  addPermanentMount:
+    - getStorageCtid
+    - script: |
+        return jelastic.env.file.AddMountPointById("${env.envName}", session, "${targetNodes.master.id}", "/opt/backup", "nfs4", null, "/data/", "${response.storageCtid}", "DBBackupRestore", false);
+
+  removePermanentMount:
+    - getStorageCtid
+    - script: |
+        var allMounts = jelastic.env.file.GetMountPoints("${env.envName}", session, "${targetNodes.master.id}").array;
+        for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (allMounts[i].path == "/opt/backup" && allMounts[i].type == "INTERNAL") {
+              resp = jelastic.env.file.RemoveMountPointById("${env.envName}", session, "${targetNodes.master.id}", "/opt/backup");
+              if (resp.result != 0) { return resp; }
+            }
+        }
+        allMounts = jelastic.env.file.GetMountPoints("${env.envName}", session).array;
+        for (var i = 0, n = allMounts.length; i < n; i++) {
+            if (allMounts[i].path == "/opt/backup" && allMounts[i].type == "INTERNAL") {
+              resp = jelastic.env.file.RemoveMountPointByGroup("${env.envName}", session, "sqldb", "/opt/backup");
+              if (resp.result != 0) { return resp; }
+            }
+        }
+        return { "result": 0 };

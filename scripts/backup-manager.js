@@ -10,6 +10,7 @@ function BackupManager(config) {
      *  envName : {String}
      *  envAppid : {String}
      *  storageNodeId : {String}
+     *  isAlwaysUmount : {Boolean}
      *  backupExecNode : {String}
      *  [storageEnv] : {String}
      *  [backupCount] : {String}
@@ -65,6 +66,7 @@ function BackupManager(config) {
                 cronTime: config.cronTime,
                 storageEnv: config.storageEnv,
                 backupCount: config.backupCount,
+		isAlwaysUmount : config.isAlwaysUmount,
                 backupLogFile: "/var/log/backup_addon.log"
             }],
             [me.createScript],
@@ -108,6 +110,10 @@ function BackupManager(config) {
         return { result: 0, storageCtid : storageNode.id };
     }
 
+    me.initBoolValue = function initBoolValue(value) {
+        return typeof value == "boolean" ? value : String(value) != "false";
+    };
+	
     me.backup = function () {
         var backupType, isManual = !getParam("task");
 
@@ -125,6 +131,7 @@ function BackupManager(config) {
                 backupLogFile : "/var/log/backup_addon.log",
                 baseUrl : config.baseUrl,
                 backupType : backupType,
+		isAlwaysUmount : config.isAlwaysUmount,
 		session : session,
 		email : user.email
         }
@@ -133,8 +140,8 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMount],
-            [me.addMountForBackup],
+            [me.removeMount, config.isAlwaysUmount],
+            [me.addMountForBackup, config.isAlwaysUmount],
             [me.cmd, [
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
                 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
@@ -164,7 +171,7 @@ function BackupManager(config) {
             [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh check_backup_repo %(baseUrl) %(backupType) %(nodeId) %(backupLogFile) %(envName) %(backupCount) %(appPath) %(session) %(email)'
             ], backupCallParams ],
-            [me.removeMount]
+            [me.removeMount, config.isAlwaysUmount]
         ]);
     };
 
@@ -173,8 +180,8 @@ function BackupManager(config) {
             [me.checkEnvStatus],
             [me.checkStorageEnvStatus],
             [me.checkCurrentlyRunningBackup],
-            [me.removeMount],
-            [me.addMountForRestore],
+            [me.removeMount, config.isAlwaysUmount],
+            [me.addMountForRestore, config.isAlwaysUmount],
             [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'restic self-update 2>&1', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR GOGC=20 restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
             {
                 nodeGroup: "cp",
@@ -198,11 +205,11 @@ function BackupManager(config) {
                 nodeGroup: "cp",
                 envName: config.envName
             }],
-            [me.removeMount]
+            [me.removeMount, config.isAlwaysUmount]
         ]);
     }
 
-    me.addMountForBackup = function addMountForBackup() {
+    me.addMountForBackup = function addMountForBackup(isAlwaysUmount) {
 	var resp = me.getStorageNodeId();
 	if (resp.result != 0) {
             throw new Error("can't get backup storage node id: " + toJSON(resp));
@@ -210,66 +217,73 @@ function BackupManager(config) {
 	var currentStorageNodeId = resp.storageCtid;
         var delay = (Math.floor(Math.random() * 50) * 1000);
 	    java.lang.Thread.sleep(delay);
-        resp = api.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', currentStorageNodeId, 'WPBackupRestore', false);
-        if (resp.result != 0) {
-	    if (resp.result != 2031) {
-                var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-	    }
+
+	isAlwaysUmount = String(isAlwaysUmount) || false;
+        isAlwaysUmount = me.initBoolValue(isAlwaysUmount)
+        if (isAlwaysUmount) {    
+            resp = api.env.file.AddMountPointById(config.envName, session, config.backupExecNode, "/opt/backup", 'nfs4', null, '/data/', currentStorageNodeId, 'WPBackupRestore', false);
+            if (resp.result != 0) {
+	        if (resp.result != 2031) {
+                    var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                        text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+                    try {
+                        api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                    } catch (ex) {
+                        emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+                    }
+	        }
+            }
+	    return resp;
         }
-	return {
-            "result": 0
-        };
+	return { result : 0 };
     }
 
-    me.addMountForRestore = function addMountForRestore() {
+    me.addMountForRestore = function addMountForRestore(isAlwaysUmount) {
 	var resp = me.getStorageNodeId();
 	if (resp.result != 0) {
             throw new Error("can't get backup storage node id: " + toJSON(resp));
         }
 	var currentStorageNodeId = resp.storageCtid;
-        resp = api.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
-        if (resp.result != 0) {
-	    if (resp.result != 2031) {
-                var title = "Backup storage " + config.storageEnv + " is unreacheable",
-                    text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
-                try {
-                    api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
-                } catch (ex) {
-                    emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
-                }
-	    }
-        }
-        return {
-            "result": 0
-        };
+	isAlwaysUmount = String(isAlwaysUmount) || false;
+        isAlwaysUmount = me.initBoolValue(isAlwaysUmount)
+        if (isAlwaysUmount) {    
+            resp = api.env.file.AddMountPointByGroup(config.envName, session, "cp", "/opt/backup", 'nfs4', null, '/data/', config.storageNodeId, 'WPBackupRestore', false);
+            if (resp.result != 0) {
+	        if (resp.result != 2031) {
+                    var title = "Backup storage " + config.storageEnv + " is unreacheable",
+                        text = "Backup storage environment " + config.storageEnv + " is not accessible for storing backups from " + config.envName + ". The error message is " + resp.error;
+                    try {
+                        api.message.email.Send(appid, signature, null, user.email, user.email, title, text);
+                    } catch (ex) {
+                        emailResp = error(Response.ERROR_UNKNOWN, toJSON(ex));
+                    }
+	        }
+            }
+            return resp;
+	}
+	return { result : 0 };
     }
 
-    me.removeMount = function removeMount() {
+    me.removeMount = function removeMount(isAlwaysUmount) {
         resp = api.env.control.GetEnvInfo(config.envName, session);
         if (resp.result != 0) {
             return resp;
         }
 	var cpNodes = resp.nodes;
-        for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
-            var allMounts = api.env.file.GetMountPoints(config.envName, session, cpNodes[currentNode].id).array;
-            for (var i = 0, n = allMounts.length; i < n; i++) {
-                if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
-                    resp = api.env.file.RemoveMountPointById(config.envName, session, cpNodes[currentNode].id, "/opt/backup");
-                    if (resp.result != 0) {
-                        return resp;
+	isAlwaysUmount = String(isAlwaysUmount) || false;
+        isAlwaysUmount = me.initBoolValue(isAlwaysUmount)
+	if (isAlwaysUmount) {
+            for (var currentNode = 0, cpNodesCount = cpNodes.length; currentNode < cpNodesCount; currentNode++) {
+                var allMounts = api.env.file.GetMountPoints(config.envName, session, cpNodes[currentNode].id).array;
+                for (var i = 0, n = allMounts.length; i < n; i++) {
+                    if (allMounts[i].sourcePath == "/data" && allMounts[i].path == "/opt/backup" && allMounts[i].name == "WPBackupRestore" && allMounts[i].type == "INTERNAL") {
+                        resp = api.env.file.RemoveMountPointById(config.envName, session, cpNodes[currentNode].id, "/opt/backup");
+                        if (resp.result != 0) { return resp; }
                     }
                 }
             }
-        }   
-        return {
-            "result": 0
-        };
+	}
+	return { result: 0 }
     }
 
     me.checkEnvStatus = function checkEnvStatus() {
