@@ -5,7 +5,7 @@ id: wp-backup
 targetEditions: any
 logo: /images/backup-logo.svg
 description: Backup Add-On for the WordPress application root directory and the database. It can be used to create scheduled backups according to any required timezone and restore corrupted websites, even if the content has been completely deleted.
-baseUrl: https://raw.githubusercontent.com/sych74/backup-addon/JE-71149
+baseUrl: https://raw.githubusercontent.com/jelastic-jps/backup-addon/main
 
 targetNodes:
   nodeType:
