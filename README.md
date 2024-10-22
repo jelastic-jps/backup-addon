@@ -3,7 +3,7 @@
 
 # Backup Add-On
 
-Backup Add-On is a solution that backups filesystem and database of a web application to [Backup Storage](https://docs.jelastic.com/shared-storage-container/) node within the Virtuozzo Application Platform. 
+Backup Add-On is a solution that backups filesystem and database of a web application to [Backup Storage](https://www.virtuozzo.com/application-platform-docs/shared-storage-container/) node within the Virtuozzo Application Platform. 
 The list of supported web applications:
 
  - WordPress
@@ -31,7 +31,7 @@ On the backup storage node, the Restic is used to serve requests from Applicatio
 <img src="images/import.png" width="400">
 </p>
 
- or invoke add-on installation within [Application server layer](https://docs.jelastic.com/paas-components-definition/#layer) addons
+ or invoke add-on installation within [Application server layer](https://www.virtuozzo.com/application-platform-docs/concept-and-terminology/#layer) addons
 
 <p align="left"> 
 <img src="images/addons.png" width="700">
