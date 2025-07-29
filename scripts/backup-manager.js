@@ -146,14 +146,14 @@ function BackupManager(config) {
 		'[ -f /root/%(envName)_backup-logic.sh ] && rm -f /root/%(envName)_backup-logic.sh || true',
                 'wget -O /root/%(envName)_backup-logic.sh %(baseUrl)/scripts/backup-logic.sh'
             ], {
-		nodeGroup: "cp",
+		nodeId: config.backupExecNode,
                 envName : config.envName,
 		baseUrl : config.baseUrl
 	        }],
             [me.cmd, [
                 'bash /root/%(envName)_backup-logic.sh update_restic'
             ], {
-                nodeGroup: "cp",
+                nodeId: config.backupExecNode,
                 envName: config.envName
             } ],
             [me.cmd, [
@@ -184,7 +184,7 @@ function BackupManager(config) {
             [me.addMountForRestore, config.isAlwaysUmount],
             [me.cmd, ['echo $(date) %(envName) Restoring the snapshot $(cat /root/.backupid)', 'restic self-update 2>&1', 'if [ -e /root/.backupedenv ]; then REPO_DIR=$(cat /root/.backupedenv); else REPO_DIR="%(envName)"; fi', 'jem service stop', 'SNAPSHOT_ID=$(RESTIC_PASSWORD=$REPO_DIR restic -r /opt/backup/$REPO_DIR snapshots|grep $(cat /root/.backupid)|awk \'{print $1}\')', '[ -n "${SNAPSHOT_ID}" ] || false', 'RESTIC_PASSWORD=$REPO_DIR GOGC=20 restic -r /opt/backup/$REPO_DIR restore ${SNAPSHOT_ID} --target /'],
             {
-                nodeGroup: "cp",
+                nodeId: config.backupExecNode,
                 envName: config.envName
             }],
             [me.cmd, [
@@ -202,7 +202,7 @@ function BackupManager(config) {
             }],
             [me.cmd, ['rm -f /root/.backupid /root/wp_db_backup.sql', 'jem service start'],
             {
-                nodeGroup: "cp",
+                nodeId: config.backupExecNode,
                 envName: config.envName
             }],
             [me.removeMount, config.isAlwaysUmount]
