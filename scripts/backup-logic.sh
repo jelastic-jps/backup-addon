@@ -50,7 +50,7 @@ function sendEmailNotification(){
 }
 
 function update_restic(){
-    restic self-update 2>&1;
+    restic version 2>&1;
 }
 
 function check_backup_repo(){
