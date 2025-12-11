@@ -50,7 +50,15 @@ function sendEmailNotification(){
 }
 
 function update_restic(){
-    restic version 2>&1;
+    if which dnf 2>&1; then
+          dnf update -y restic 2>&1
+    else
+          yum-config-manager --disable nodesource 2>&1
+          yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/copart/restic/repo/epel-7/copart-restic-epel-7.repo 2>&1
+          yum-config-manager --enable copr:copr.fedorainfracloud.org:copart:restic 2>&1
+          yum -y update restic 2>&1
+          yum-config-manager --disable copr:copr.fedorainfracloud.org:copart:restic 2>&1
+    fi 
 }
 
 function check_backup_repo(){
