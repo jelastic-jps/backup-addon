@@ -10,20 +10,13 @@ APP_PATH=$8
 USER_SESSION=$9
 USER_EMAIL=${10}
 
-if which restic 2>&1; then
-    true
-else
-    if which dnf 2>&1; then
-          dnf install -y epel-release 2>&1
-          dnf install -y restic 2>&1
-    else
-          yum-config-manager --disable nodesource 2>&1
-          yum-config-manager --add-repo https://copr.fedorainfracloud.org/coprs/copart/restic/repo/epel-7/copart-restic-epel-7.repo 2>&1
-          yum-config-manager --enable copr:copr.fedorainfracloud.org:copart:restic 2>&1
-          yum -y install restic 2>&1
-          yum-config-manager --disable copr:copr.fedorainfracloud.org:copart:restic 2>&1
-    fi 
-fi
+function forceInstallUpdateRestic(){
+    RESTIC_LATEST_VERSION=$(timeout 60 git ls-remote --tags https://github.com/restic/restic.git 2>/dev/null|grep -v alpha|grep -v rc|grep -v "{}"|grep -v doc|awk -F / '{print $3}'|grep -o [0-9.]*|sort -V|tail -n 1);
+    [ -n "${RESTIC_LATEST_VERSION}" ] || RESTIC_LATEST_VERSION="0.18.1"
+    repo_url="https://github.com/restic/restic/releases/download/v${RESTIC_LATEST_VERSION}/restic_${RESTIC_LATEST_VERSION}_linux_amd64.bz2"
+    wget --tries=10 -O restic.bz2 $repo_url 2>&1 && bzip2 -d restic.bz2 && rm -f restic.bz2 && \
+    strip restic && mv -f restic /usr/bin/restic && chmod +x /usr/bin/restic;
+}
 
 function sendEmailNotification(){
     if [ -e "/usr/lib/jelastic/modules/api.module" ]; then
@@ -50,7 +43,11 @@ function sendEmailNotification(){
 }
 
 function update_restic(){
-    restic self-update 2>&1;
+    if which restic 2>&1; then
+        restic self-update 2>&1 || forceInstallUpdateRestic
+    else
+        forceInstallUpdateRestic
+    fi
 }
 
 function check_backup_repo(){
