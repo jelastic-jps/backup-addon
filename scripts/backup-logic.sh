@@ -83,21 +83,30 @@ function create_snapshot(){
     echo $(date) ${ENV_NAME} "End uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
 }
 
+function load_wp_db_config(){
+    local wp_config="${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php"
+    [ -f "$wp_config" ] || { echo $(date) ${ENV_NAME} "wp-config.php not found in ${APP_PATH:-/var/www/webroot/ROOT}" | tee -a ${BACKUP_LOG_FILE}; exit 1; }
+    eval "$(php -r '
+$s=file_get_contents($argv[1]);
+foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)
+ if(preg_match("/define\s*\(\s*[\x27\"]".$k."[\x27\"]\s*,\s*[\x27\"]([^\x27\"]*)[\x27\"]\s*\)/",$s,$m))
+  echo$k."=".var_export($m[1],1).PHP_EOL;
+' "$wp_config" 2>/dev/null)"
+
+    if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST" ]; then
+        echo $(date) ${ENV_NAME} "Failed to read DB credentials from wp-config.php" | tee -a ${BACKUP_LOG_FILE}
+        exit 1
+    fi
+}
+
 function backup(){
     echo $$ > /var/run/${ENV_NAME}_backup.pid
     BACKUP_ADDON_REPO=$(echo ${BASE_URL}|sed 's|https:\/\/raw.githubusercontent.com\/||'|awk -F / '{print $1"/"$2}')
     BACKUP_ADDON_BRANCH=$(echo ${BASE_URL}|sed 's|https:\/\/raw.githubusercontent.com\/||'|awk -F / '{print $3}')
     BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk '{print $1}')
     echo $(date) ${ENV_NAME} "Creating the ${BACKUP_TYPE} backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID}) on storage node ${NODE_ID}" | tee -a ${BACKUP_LOG_FILE}
-    for i in DB_USER DB_PASSWORD DB_NAME; do declare "${i}"=$(cat /var/www/webroot/ROOT/wp-config.php|grep ${i}|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1); done
-    DB_HOST=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $1}');
-    DB_PORT=$(cat /var/www/webroot/ROOT/wp-config.php|grep DB_HOST|grep -v '^[[:space:]]*#'|tr -d '[[:blank:]]'|awk -F ',' '{print $2}'|tr -d "\"');"|tr -d '\r'|tail -n 1|awk -F ':' '{print $2}');
-    if [ -n "${DB_PORT}" ]; then 
-        MYSQLDUMP_DB_PORT_OPTION="-P ${DB_PORT}"
-    else
-        MYSQLDUMP_DB_PORT_OPTION=""
-    fi
-    SERVER_VERSION_STRING=$(mysql -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
+    load_wp_db_config
+    SERVER_VERSION_STRING=$(mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
     WP_DB_STACK_NAME=$(echo $SERVER_VERSION_STRING|awk '{print $4}')
     WP_DB_STACK_NAME=${WP_DB_STACK_NAME^^}
     WP_DB_STACK_VERSION=$(echo ${SERVER_VERSION_STRING}|awk '{print $3}'|awk -F '-' '{print $1}')
@@ -107,7 +116,7 @@ function backup(){
     fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
-    mysqldump -h ${DB_HOST} -u ${DB_USER} ${MYSQLDUMP_DB_PORT_OPTION} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
+    mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     rm -f /var/run/${ENV_NAME}_backup.pid
 }
 
@@ -127,8 +136,13 @@ case "$1" in
     update_restic)
 	$1
         ;;
+    read_wp_db_config)
+        APP_PATH=${2:-/var/www/webroot/ROOT}
+        load_wp_db_config
+        printf 'DB_NAME=%q\nDB_USER=%q\nDB_PASSWORD=%q\nDB_HOST=%q\n' "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$DB_HOST"
+        ;;
     *)
-        echo "Usage: $0 {backup|check_backup_repo|rotate_snapshots|create_snapshot}"
+        echo "Usage: $0 {backup|check_backup_repo|rotate_snapshots|create_snapshot|read_wp_db_config}"
         exit 2
 esac
 
