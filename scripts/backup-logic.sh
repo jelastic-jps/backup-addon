@@ -83,20 +83,53 @@ function create_snapshot(){
     echo $(date) ${ENV_NAME} "End uploading the ${DUMP_NAME} snapshot to backup storage" | tee -a ${BACKUP_LOG_FILE}
 }
 
+function wp_db_client_args(){
+    WP_DB_CLIENT_ARGS=()
+    [ -n "$DB_SOCKET" ] && WP_DB_CLIENT_ARGS+=(-S "$DB_SOCKET")
+    [ -n "$DB_HOST" ] && WP_DB_CLIENT_ARGS+=(-h "$DB_HOST")
+    [ -n "$DB_PORT" ] && WP_DB_CLIENT_ARGS+=(-P "$DB_PORT")
+}
+
 function load_wp_db_config(){
     local wp_config="${APP_PATH:-/var/www/webroot/ROOT}/wp-config.php"
     [ -f "$wp_config" ] || { echo $(date) ${ENV_NAME} "wp-config.php not found in ${APP_PATH:-/var/www/webroot/ROOT}" | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     eval "$(php -r '
 $s=file_get_contents($argv[1]);
-foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)
+$vals=array();
+foreach(array("DB_NAME","DB_USER","DB_PASSWORD","DB_HOST") as $k)
  if(preg_match("/define\s*\(\s*[\x27\"]".$k."[\x27\"]\s*,\s*[\x27\"]([^\x27\"]*)[\x27\"]\s*\)/",$s,$m))
-  echo$k."=".var_export($m[1],1).PHP_EOL;
+  $vals[$k]=$m[1];
+$host=isset($vals["DB_HOST"])?$vals["DB_HOST"]:"";
+$socket="";
+$port="";
+$pos=strpos($host,":/");
+if($pos!==false){
+ $socket=substr($host,$pos+1);
+ $host=substr($host,0,$pos);
+}
+if(substr_count($host,":")>1)
+ $re="#^(?:\[)?(?P<host>[0-9a-fA-F:]+)(?:\]:(?P<port>[0-9]+))?#";
+else
+ $re="#^(?P<host>[^:/]*)(?::(?P<port>[0-9]+))?#";
+if($host!=="" && preg_match($re,$host,$m)===1){
+ $host=isset($m["host"])?$m["host"]:"";
+ if(isset($m["port"]) && $m["port"]!==""){
+  $p=intval($m["port"]);
+  if($p>0) $port=(string)$p;
+ }
+}
+foreach(array("DB_NAME","DB_USER","DB_PASSWORD") as $k)
+ if(isset($vals[$k])) echo $k."=".var_export($vals[$k],true).PHP_EOL;
+echo "DB_HOST=".var_export($host,true).PHP_EOL;
+echo "DB_PORT=".var_export($port,true).PHP_EOL;
+echo "DB_SOCKET=".var_export($socket,true).PHP_EOL;
 ' "$wp_config" 2>/dev/null)"
 
-    if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST" ]; then
+    if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || { [ -z "$DB_HOST" ] && [ -z "$DB_SOCKET" ]; }; then
         echo $(date) ${ENV_NAME} "Failed to read DB credentials from wp-config.php" | tee -a ${BACKUP_LOG_FILE}
         exit 1
     fi
+    wp_db_client_args
 }
 
 function backup(){
@@ -106,7 +139,7 @@ function backup(){
     BACKUP_ADDON_COMMIT_ID=$(git ls-remote https://github.com/${BACKUP_ADDON_REPO}.git | grep "/${BACKUP_ADDON_BRANCH}$" | awk '{print $1}')
     echo $(date) ${ENV_NAME} "Creating the ${BACKUP_TYPE} backup (using the backup addon with commit id ${BACKUP_ADDON_COMMIT_ID}) on storage node ${NODE_ID}" | tee -a ${BACKUP_LOG_FILE}
     load_wp_db_config
-    SERVER_VERSION_STRING=$(mysql -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
+    SERVER_VERSION_STRING=$(mysql "${WP_DB_CLIENT_ARGS[@]}" -u ${DB_USER} -p${DB_PASSWORD} -e 'status'|grep 'Server version')
     WP_DB_STACK_NAME=$(echo $SERVER_VERSION_STRING|awk '{print $4}')
     WP_DB_STACK_NAME=${WP_DB_STACK_NAME^^}
     WP_DB_STACK_VERSION=$(echo ${SERVER_VERSION_STRING}|awk '{print $3}'|awk -F '-' '{print $1}')
@@ -116,7 +149,7 @@ function backup(){
     fi
     echo $(date) ${ENV_NAME} "Creating the DB dump" | tee -a ${BACKUP_LOG_FILE}
     source /etc/jelastic/metainf.conf ; if [ "${COMPUTE_TYPE}" == "lemp" -o "${COMPUTE_TYPE}" == "llsmp" ]; then service mysql status 2>&1 || service mysql start 2>&1; fi
-    mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
+    mysqldump "${WP_DB_CLIENT_ARGS[@]}" -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} --force --single-transaction --quote-names --opt --databases ${COL_STAT} > wp_db_backup.sql || { echo $(date) ${ENV_NAME} "DB backup process failed." | tee -a ${BACKUP_LOG_FILE}; exit 1; }
     rm -f /var/run/${ENV_NAME}_backup.pid
 }
 
@@ -139,7 +172,12 @@ case "$1" in
     read_wp_db_config)
         APP_PATH=${2:-/var/www/webroot/ROOT}
         load_wp_db_config
-        printf 'DB_NAME=%q\nDB_USER=%q\nDB_PASSWORD=%q\nDB_HOST=%q\n' "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$DB_HOST"
+        printf 'DB_NAME=%q\nDB_USER=%q\nDB_PASSWORD=%q\nDB_HOST=%q\nDB_PORT=%q\nDB_SOCKET=%q\n' "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$DB_HOST" "$DB_PORT" "$DB_SOCKET"
+        printf 'WP_DB_CLIENT_ARGS=('
+        for wp_db_arg in "${WP_DB_CLIENT_ARGS[@]}"; do
+            printf ' %q' "$wp_db_arg"
+        done
+        printf ' )\n'
         ;;
     *)
         echo "Usage: $0 {backup|check_backup_repo|rotate_snapshots|create_snapshot|read_wp_db_config}"
