@@ -93,6 +93,10 @@ foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)
   echo$k."=".var_export($m[1],1).PHP_EOL;
 ' "$wp_config" 2>/dev/null)"
 
+    if [[ "$DB_HOST" =~ ^(.+):[0-9]+$ ]]; then
+        DB_HOST="${BASH_REMATCH[1]}"
+    fi
+
     if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_HOST" ]; then
         echo $(date) ${ENV_NAME} "Failed to read DB credentials from wp-config.php" | tee -a ${BACKUP_LOG_FILE}
         exit 1
