@@ -93,9 +93,7 @@ foreach(["DB_NAME","DB_USER","DB_PASSWORD","DB_HOST"]as$k)
   echo$k."=".var_export($m[1],1).PHP_EOL;
 ' "$wp_config" 2>/dev/null)"
 
-    if [[ "$DB_HOST" =~ ^\[(.+)\]:[0-9]+$ ]]; then
-        DB_HOST="${BASH_REMATCH[1]}"
-    elif [[ "$DB_HOST" =~ ^(.+):[0-9]+$ ]]; then
+    if [[ "$DB_HOST" =~ ^(.+):[0-9]+$ ]]; then
         DB_HOST="${BASH_REMATCH[1]}"
     fi
 
